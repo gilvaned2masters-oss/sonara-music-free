@@ -1,17 +1,12 @@
 import { asaas } from './_shared/asaas';
-import { getMpPaymentStatus } from './_shared/mercadopago';
 import { sendMetaCapiPurchase } from './_shared/meta-capi';
 import { kvPutOrder } from './_shared/kv-helpers';
-import { kiwifyFetch } from './_shared/kiwify-auth';
 
 interface Env {
   ORDERS_KV: KVNamespace;
   ASAAS_API_KEY: string;
-  MERCADO_PAGO_ACCESS_TOKEN: string;
   META_PIXEL_ID: string;
   META_CAPI_TOKEN: string;
-  KIWIFY_ACCESS_ID: string;
-  KIWIFY_PRIVATE_KEY_HEX: string;
 }
 
 function json(data: unknown, status = 200): Response {
@@ -36,48 +31,16 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   let status = String(order['status'] ?? 'PENDING');
 
   if (!isPaid) {
-    const provider = String(order['provider'] ?? '');
-    const isMp = provider === 'mercadopago';
-    const isKiwify = provider === 'kiwify';
-    const mpId = String(order['mpPaymentId'] ?? '');
-
-    if (isKiwify && env.KIWIFY_ACCESS_ID && env.KIWIFY_PRIVATE_KEY_HEX) {
-      // Pedido Kiwify — consulta o status do QR (backup do webhook)
-      const qrId = String(order['kiwify_qr_id'] ?? '');
-      if (qrId) {
-        const kw = await kiwifyFetch(env.KIWIFY_ACCESS_ID, env.KIWIFY_PRIVATE_KEY_HEX, 'GET', '/v1/dynamic-qrcode/' + qrId);
-        if (kw.ok && String(kw.data['status'] ?? '').toLowerCase() === 'paid') {
-          isPaid = true;
-          status = 'CONFIRMED';
-          order['paid'] = true;
-          order['status'] = 'CONFIRMED';
-          order['updated_at'] = new Date().toISOString();
-          if (env.ORDERS_KV) await kvPutOrder(env.ORDERS_KV, paymentId, order);
-        }
-      }
-    } else if (isMp && mpId && env.MERCADO_PAGO_ACCESS_TOKEN) {
-      // Pedido MP — consultar status diretamente na API do MP
-      const mpStatus = await getMpPaymentStatus(env.MERCADO_PAGO_ACCESS_TOKEN, mpId);
-      if (mpStatus === 'approved') {
-        isPaid = true;
-        status = 'CONFIRMED';
+    // Projeto Sonara: consulta exclusivamente o status oficial do Asaas.
+    const res = await asaas(env.ASAAS_API_KEY, 'GET', `/payments/${encodeURIComponent(paymentId)}`);
+    if (res.ok && res.data['status']) {
+      status = String(res.data['status']);
+      isPaid = PAID_STATUSES.includes(status);
+      if (isPaid) {
         order['paid'] = true;
-        order['status'] = 'CONFIRMED';
+        order['status'] = status;
         order['updated_at'] = new Date().toISOString();
         if (env.ORDERS_KV) await kvPutOrder(env.ORDERS_KV, paymentId, order);
-      }
-    } else if (!isMp && !isKiwify) {
-      // Pedido Asaas — consultar status no Asaas
-      const res = await asaas(env.ASAAS_API_KEY, 'GET', `/payments/${encodeURIComponent(paymentId)}`);
-      if (res.ok && res.data['status']) {
-        status = String(res.data['status']);
-        isPaid = PAID_STATUSES.includes(status);
-        if (isPaid) {
-          order['paid'] = true;
-          order['status'] = status;
-          order['updated_at'] = new Date().toISOString();
-          if (env.ORDERS_KV) await kvPutOrder(env.ORDERS_KV, paymentId, order);
-        }
       }
     }
   }
