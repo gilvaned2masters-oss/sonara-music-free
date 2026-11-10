@@ -1,5 +1,7 @@
 # Sonara Music
 
+Cloudflare Pages deployment with isolated order storage and protected administration.
+
 Oferta independente da Sonara Music publicada no Cloudflare Pages.
 
 - Checkout Pix via Asaas
