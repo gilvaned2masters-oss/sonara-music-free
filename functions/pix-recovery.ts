@@ -1,15 +1,10 @@
 import { asaas } from './_shared/asaas';
-import { createMpPixPayment } from './_shared/mercadopago';
 import { kvPutOrder } from './_shared/kv-helpers';
 import { sendEmail, buildRecoveryEmail } from './_shared/resend';
-import { kiwifyFetch } from './_shared/kiwify-auth';
 
 interface Env {
   ORDERS_KV: KVNamespace;
   ASAAS_API_KEY: string;
-  MERCADO_PAGO_ACCESS_TOKEN: string;
-  KIWIFY_ACCESS_ID: string;
-  KIWIFY_PRIVATE_KEY_HEX: string;
   RESEND_API_KEY: string;
   FROM_EMAIL: string;
   OWNER_WHATSAPP: string;
@@ -42,34 +37,14 @@ function subjectFor(stage: number, name: string, title: string): string {
   return `🚨 Última chance, ${name} — não perca sua música`;
 }
 
-// Gera um PIX NOVO (códigos PIX expiram) e envia o email do estágio. Kiwify (sem taxa) primeiro.
+// Gera um novo PIX Asaas (códigos PIX expiram) e envia o email do estágio.
 async function sendRecovery(env: Env, paymentId: string, order: Record<string, unknown>, stage: number): Promise<boolean> {
   const now = Date.now();
   const value = Number(order['value'] ?? 39.9);
   let pixPayload = '';
   let encodedImage: string | null = null;
 
-  const isKiwify = order['provider'] === 'kiwify' || !!order['kiwify_qr_id'] || paymentId.startsWith('music-');
-
-  // 1. Kiwify — QR dinâmico novo, SEM taxa por venda
-  if (isKiwify && env.KIWIFY_ACCESS_ID && env.KIWIFY_PRIVATE_KEY_HEX) {
-    try {
-      const kw = await kiwifyFetch(env.KIWIFY_ACCESS_ID, env.KIWIFY_PRIVATE_KEY_HEX, 'POST', '/v1/dynamic-qrcode', {
-        amount_in_cents: Math.round(value * 100), type: 'INSTANT', description: 'Masters Music - finalize seu pedido',
-      });
-      const qrId = String(kw.data['id'] ?? '');
-      if (kw.ok && qrId && kw.data['copy_paste']) {
-        pixPayload = String(kw.data['copy_paste']);
-        encodedImage = String(kw.data['picture_code_base64'] ?? '') || null;
-        order['recovery_kiwify_qr_id'] = qrId;
-        // reverse lookup: webhook do novo pagamento acha este pedido
-        await env.ORDERS_KV.put('kqr:' + qrId, paymentId, { expirationTtl: 86400 * 7 }).catch(() => {});
-      }
-    } catch (e) { console.error('[pix-recovery] kiwify exceção', String(e)); }
-  }
-
-  // 2. Fallback Asaas (pedidos antigos com customerId)
-  if (!pixPayload && order['customerId']) {
+  if (order['customerId'] && env.ASAAS_API_KEY) {
     const newPay = await asaas(env.ASAAS_API_KEY, 'POST', '/payments', {
       customer: order['customerId'], billingType: 'PIX', value,
       dueDate: new Date(now + 86400000).toISOString().slice(0, 10),
@@ -84,16 +59,6 @@ async function sendRecovery(env: Env, paymentId: string, order: Record<string, u
         await env.ORDERS_KV.put('ext:' + newId, paymentId, { expirationTtl: 86400 * 7 }).catch(() => {});
       }
     }
-  }
-
-  // 3. Fallback Mercado Pago
-  if (!pixPayload && env.MERCADO_PAGO_ACCESS_TOKEN) {
-    const mp = await createMpPixPayment(env.MERCADO_PAGO_ACCESS_TOKEN, {
-      amount: value, email: String(order['email']), name: String(order['name'] ?? 'Cliente'),
-      cpf: String(order['cpf'] ?? ''), description: 'Masters Music – recuperação',
-      externalRef: String(order['externalReference'] ?? paymentId) + '-rec' + stage,
-    });
-    if (mp.ok && mp.payload) { pixPayload = mp.payload; encodedImage = mp.encodedImage ?? null; order['recoveryMpPaymentId'] = mp.mpPaymentId; }
   }
 
   if (!pixPayload) { console.log('[pix-recovery] sem payload', paymentId); return false; }
