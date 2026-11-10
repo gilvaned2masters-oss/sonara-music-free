@@ -1,0 +1,11 @@
+name = "sonara-music-free"
+compatibility_date = "2024-09-23"
+pages_build_output_dir = "public"
+
+[[kv_namespaces]]
+binding = "ORDERS_KV"
+id = "REPLACE_WITH_NEW_SONARA_KV_NAMESPACE_ID"
+
+[[r2_buckets]]
+binding = "AUDIO_BUCKET"
+bucket_name = "sonara-music-audio"
