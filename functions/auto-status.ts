@@ -9,7 +9,10 @@ import { storeMp3ToR2 } from './_shared/audio-store';
 
 interface Env {
   ORDERS_KV: KVNamespace;
-  AUDIO_BUCKET: R2Bucket;
+  // R2 is optional while the Pages project is being brought online.  When it
+  // is not bound yet, delivery still completes with the provider URL instead
+  // of throwing before the customer receives their music.
+  AUDIO_BUCKET?: R2Bucket;
   SUNOR_API_KEY: string;
   KIE_API_KEY: string;
   RESEND_API_KEY: string;
@@ -23,6 +26,7 @@ interface Env {
 // Baixa as músicas (URLs externas) e as guarda no R2, devolvendo /audio/{id}.
 // URLs do KIE expiram; o R2 (nosso domínio) é permanente.
 async function toR2(env: Env, paymentId: string, urls: string[]): Promise<string[]> {
+  if (!env.AUDIO_BUCKET) return urls;
   const out: string[] = [];
   for (let i = 0; i < urls.length; i++) {
     const u = urls[i];
