@@ -151,6 +151,14 @@ tr:hover td{background:#1a1a24}
     <div class="stat"><div class="sv" id="s-revenue">-</div><div class="sl">Receita total</div></div>
   </div>
 
+  <div style="margin:10px 20px 0;background:#0f0f18;border:1px solid #213454;border-radius:12px;padding:12px 16px">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+      <div><div style="font-size:12px;font-weight:700;color:#60a5fa;text-transform:uppercase;letter-spacing:.5px">Meta Ads · gasto de hoje</div><div id="meta-spend" style="font-size:26px;font-weight:800;color:#e8e8f0;margin-top:4px">Carregando…</div></div>
+      <button class="rev-tab" onclick="loadMetaSpend()">Atualizar gasto</button>
+    </div>
+    <div id="meta-campaigns" style="font-size:12px;color:#8b9bb4;margin-top:8px">Fonte: Meta Marketing API</div>
+  </div>
+
   <!-- Painel de Faturamento por Período -->
   <div style="margin:10px 20px 0;background:#0f0f18;border:1px solid #2a2a3a;border-radius:12px;padding:12px 16px">
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
@@ -728,6 +736,7 @@ function fetchAllOrders(cursor, accumulated) {
         document.getElementById('app').style.display = 'flex';
         updateStats(); updateTodayBar(); renderTable();
         loadEsRevenue();
+        loadMetaSpend();
         if (campOpen) renderCampaigns();
       }
     })
@@ -750,6 +759,23 @@ function isToday(o) {
 
 function fmtBRL(v) {
   return 'R$ ' + v.toFixed(2).replace('.',',');
+}
+
+function loadMetaSpend() {
+  var total = document.getElementById('meta-spend');
+  var campaigns = document.getElementById('meta-campaigns');
+  if (!total || !campaigns) return;
+  total.textContent = 'Carregando…';
+  fetch('/meta-spend', { headers: { 'Authorization': auth }, cache: 'no-store' })
+    .then(function(r){ return r.ok ? r.json() : Promise.reject(); })
+    .then(function(data){
+      total.textContent = fmtBRL(Number(data.spend) || 0);
+      var items = (data.campaigns || []).filter(function(c){ return Number(c.spend) > 0; });
+      campaigns.innerHTML = items.length
+        ? items.map(function(c){ return '<span style="display:inline-block;margin:3px 12px 0 0">' + esc(c.name) + ': <b style="color:#e8e8f0">' + fmtBRL(Number(c.spend)||0) + '</b></span>'; }).join('')
+        : 'Nenhuma campanha com gasto hoje.';
+    })
+    .catch(function(){ total.textContent = 'Indisponível'; campaigns.textContent = 'Não foi possível consultar a Meta agora.'; });
 }
 
 function dateStrOf(d) {
