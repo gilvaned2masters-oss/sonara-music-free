@@ -23,8 +23,8 @@
   <meta name="twitter:title" content="Música Personalizada Para quem você Ama — O Presente Perfeito | Sonara Music">
   <meta name="twitter:description" content="Transforme sua história em uma música cantada e emocionante — o presente perfeito pra surpreender quem você ama.">
   <meta name="twitter:image" content="https://sonaramusic.pro/images/logo-oficial.png.png">
-  <!-- Dados estruturados (Google rich results + leitura por IA) -->
-  <script type="text/javascript" async="" src="js/events.js"></script><script async="" src="https://www.clarity.ms/tag/xkwa3qi5wh"></script><script type="application/ld+json">
+  <!-- Dados estruturados -->
+  <script type="application/ld+json">
   {
     "@context": "https://schema.org",
     "@graph": [
@@ -65,118 +65,19 @@
     ]
   }
   </script>
-  <!-- Captura de erro JS → /track (event js_error). Motivo: Clarity 10/11 mostrou erro de script em 17% das
-       sessões no app Facebook e 11% no Instagram (Android), sem dizer qual. Primeiro script da página de
-       propósito, pra pegar erro de tudo que vem depois. Máx. 3 envios por carregamento, sem repetir. -->
-  <script>
-    (function(){try{
-      var sentE=0,sentR=0,seen={};
-      function q(){try{return new URLSearchParams(location.search).get('utm_campaign')||''}catch(e){return ''}}
-      function send(kind,msg,src,line,col,stack){try{
-        msg=String(msg||'').slice(0,300);src=String(src||'').slice(0,300);
-        var sig=kind+'|'+msg.slice(0,120)+'|'+src.slice(-80)+'|'+line;
-        if(seen[sig])return;if(kind==='resource'){if(sentR>=2)return;sentR++;}else{if(sentE>=3)return;sentE++;}seen[sig]=1;
-        var body=JSON.stringify({event:'js_error',kind:kind,message:msg,source:src,line:+line||0,col:+col||0,
-          stack:String(stack||'').slice(0,600),page:location.pathname,sid:window._trackSid||'',utm:q()});
-        fetch('/track',{method:'POST',headers:{'Content-Type':'application/json'},body:body,keepalive:true}).catch(function(){});
-      }catch(e){}}
-      window.addEventListener('error',function(e){
-        var t=e&&e.target;
-        if(t&&t!==window&&t.tagName){var u=t.src||t.href||'';if(!u||u===location.href)return;send('resource',String(t.tagName).toLowerCase()+(t.id?'#'+t.id:'')+' não carregou',u,0,0,'');return;}
-        send('error',e&&e.message,e&&e.filename,e&&e.lineno,e&&e.colno,e&&e.error&&e.error.stack);
-      },true);
-      window.addEventListener('unhandledrejection',function(e){
-        var r=e&&e.reason;send('promise',(r&&r.message)||String(r),(r&&r.fileName)||'',0,0,r&&r.stack);
-      });
-    }catch(e){}})();
-  </script>
-  <!-- Microsoft Clarity (heatmap + gravação de sessão) -->
-  <script type="text/javascript">
-    (function(c,l,a,r,i,t,y){
-        c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
-        t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
-        y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
-    })(window, document, "clarity", "script", "xkwa3qi5wh");
-  </script>
   <!-- Fontes -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,800;1,700&amp;family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet">
-  <!-- Preconnect domínios externos -->
-  <link rel="preconnect" href="https://connect.facebook.net" crossorigin="">
-  <link rel="preconnect" href="https://www.googletagmanager.com" crossorigin="">
-  <link rel="preconnect" href="https://www.google-analytics.com" crossorigin="">
-  <link rel="preconnect" href="https://analytics.tiktok.com" crossorigin="">
   <!-- Preload imagem LCP principal -->
   <link rel="preload" as="image" href="images/polaroids-musica.webp" fetchpriority="high">
   <script>
-    // Meta Pixel + Google tag + TikTok Pixel: stubs SÍNCRONOS (os comandos entram na fila) e o
-    // download dos scripts pesados é ADIADO para depois do 1º paint / 1ª interação. A tela
-    // renderiza sem esperar os terceiros; nenhum evento é perdido (a fila é reproduzida quando
-    // os scripts carregam). Kwai segue removido (sem campanhas ativas nesse canal).
-    !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-    n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
-    n.push=n;n.loaded=!0;n.version='2.0';n.queue=[]}(window);
-    // external_id persistente por visitante (cookie 2 anos + localStorage): deixa o Meta
-    // costurar visitante anônimo -> comprador entre sessões. O MESMO uid vai pro pedido
-    // (create-payment) e pra CAPI (hasheado) — browser e servidor contam a mesma identidade.
-    (function(){try{
-      var m=document.cookie.match(/(?:^|; )sonara_uid=([A-Za-z0-9-]{8,64})/);var u=m?m[1]:'';
-      if(!u){try{u=localStorage.getItem('sonara_uid')||''}catch(e){}}
-      if(!u){u=(window.crypto&&crypto.randomUUID)?crypto.randomUUID():'u-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,10)+Math.random().toString(36).slice(2,10);}
-      document.cookie='sonara_uid='+u+'; max-age=63072000; path=/; SameSite=Lax; Secure';
-      try{localStorage.setItem('sonara_uid',u)}catch(e){}
-      window.__sonaraUid=u;
-    }catch(e){window.__sonaraUid='';}})();
-    fbq('init', '4090193661124064', window.__sonaraUid ? {external_id: window.__sonaraUid} : {});
-    fbq('track', 'PageView');
-    fbq('track', 'ViewContent', {content_name: 'Sonara Music – Página Principal', content_type: 'product', content_ids: ['sonara_music'], currency: 'BRL', value: 39.90});
-
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
-    gtag('config', 'G-JVRD5L1TVN');
-    gtag('config', 'AW-17868003171');
-    gtag('config', 'AW-18034130220'); // Google tag da conta (o Google Ads lista os dois IDs)
-
-    // OpenAI OAIQ Pixel (ChatGPT Ads) — stub síncrono (fila de eventos); SDK carrega deferido abaixo.
-    (function(w){ if(w.oaiq) return; var q=function(){q.q.push(arguments);}; q.q=[]; w.oaiq=q; })(window);
-    oaiq('init', { pixelId: 'AeXsRCHTHAMiP4nvkCMM3B' });
-    oaiq('measure', 'page_viewed', { type: 'contents' });
-
-    // TikTok Pixel — stub síncrono (fila de eventos); o SDK real (events.js) carrega deferido
-    // abaixo, junto dos outros. ttq.load() é quem baixa o script pesado, por isso NÃO é chamado
-    // aqui — só fica pronto pra ser chamado em loadTP(). ttq.page() pode ir na fila já.
-    !function (w, d, t) {
-      w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group","enableCookie","disableCookie","holdConsent","revokeConsent","grantConsent"],ttq.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++)ttq.setAndDefer(ttq,ttq.methods[i]);ttq.instance=function(t){for(
-      var e=ttq._i[t]||[],n=0;n<ttq.methods.length;n++)ttq.setAndDefer(e,ttq.methods[n]);return e},ttq.load=function(e,n){var r="https://analytics.tiktok.com/i18n/pixel/events.js",o=n&&n.partner;ttq._i=ttq._i||{},ttq._i[e]=[],ttq._i[e]._u=r,ttq._t=ttq._t||{},ttq._t[e]=+new Date,ttq._o=ttq._o||{},ttq._o[e]=n||{};n=document.createElement("script")
-      ;n.type="text/javascript",n.async=!0,n.src=r+"?sdkid="+e+"&lib="+t;e=document.getElementsByTagName("script")[0];e.parentNode.insertBefore(n,e)};
-    }(window, document, 'ttq');
-    ttq.page();
-
-    (function(){
-      var loaded = false;
-      function loadTP(){
-        if (loaded) return; loaded = true;
-        var fb = document.createElement('script'); fb.async = true;
-        fb.src = 'https://connect.facebook.net/en_US/fbevents.js';
-        document.head.appendChild(fb);
-        var ga = document.createElement('script'); ga.async = true;
-        ga.src = 'https://www.googletagmanager.com/gtag/js?id=G-JVRD5L1TVN';
-        document.head.appendChild(ga);
-        var oa = document.createElement('script'); oa.async = true;
-        oa.src = 'https://bzrcdn.openai.com/sdk/oaiq.min.js';
-        document.head.appendChild(oa);
-        ttq.load('DAP6FCRC77U2M9QI22SG');
-      }
-      if ('requestIdleCallback' in window) requestIdleCallback(loadTP, {timeout: 3500});
-      else window.addEventListener('load', function(){ setTimeout(loadTP, 1500); });
-      ['touchstart','scroll','mousedown','keydown'].forEach(function(ev){
-        window.addEventListener(ev, loadTP, {once:true, passive:true});
-      });
-    })();
+    /* Rastreadores externos removidos. Os stubs preservam as interações da página. */
+    window.fbq = window.fbq || function(){};
+    window.gtag = window.gtag || function(){};
+    window.oaiq = window.oaiq || function(){};
+    window.ttq = window.ttq || { track: function(){}, page: function(){} };
   </script>
-  <noscript><img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=4090193661124064&ev=PageView&noscript=1"></noscript>
   <style>
     :root {
       --ink: #182033;
@@ -797,7 +698,7 @@
     .gen-error-wrap { text-align:center;padding:16px 0; }
   </style>
   <!-- Google tag: inicializado no <head> (stub) e carregado pelo loader adiado junto do Meta Pixel -->
-<script async="" src="js/fbevents.js"></script><script async="" src="https://www.googletagmanager.com/gtag/js?id=G-JVRD5L1TVN"></script><script async="" src="js/oaiq.min.js"></script></head>
+</head>
 <body>
   <header class="topbar">
     <div class="wrap">
@@ -3371,6 +3272,5 @@ essa canção é você.`;
     })();
   </script>
 
-<!-- Cloudflare Pages Analytics --><script defer="" src="js/beacon.min.js" data-cf-beacon="{" token":="" "dc3c539ba025414a86cec2e0baf5d20b"}"=""></script><!-- Cloudflare Pages Analytics -->
 
 </body></html>
