@@ -58,7 +58,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       prodStatus: o['prodStatus'] ?? '',
       delivered: !!o['delivered'],
       value: Number(o['value'] ?? 0),
-      prontoLink: ready ? `https://mastersmusic.com.br/pronto?id=${pid}` : '',
+      prontoLink: ready ? `https://sonara-music-ewu.pages.dev/pronto?id=${pid}` : '',
     });
   }
 
@@ -71,7 +71,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       await getOrCreateOwnerCode(env.ORDERS_KV, phone, email, name);
       st = await getOwnerStatus(env.ORDERS_KV, phone);
     }
-    if (st) referral = { ...st, link: `https://mastersmusic.com.br/?ref=${st.codigo}` };
+    if (st) referral = { ...st, link: `https://sonara-music-ewu.pages.dev/?ref=${st.codigo}` };
   }
 
   return json({ ok: true, email, orders, referral, supportWhatsapp: '554188869695' });

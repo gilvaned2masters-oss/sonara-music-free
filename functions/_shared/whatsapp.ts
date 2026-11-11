@@ -36,7 +36,7 @@ export async function sendWhatsAppReady(
 
   const nome   = String(order['name'] || '').split(' ')[0] || 'Olá';
   const titulo = String(order['lyricsTitle'] || 'sua música personalizada');
-  const link   = `https://mastersmusic.com.br/pronto?id=${paymentId}`;
+  const link   = `https://sonara-music-ewu.pages.dev/pronto?id=${paymentId}`;
   const text =
     `Olá, ${nome}! 🎵\n\n` +
     `Sua música *"${titulo}"* ficou pronta! 🎉\n\n` +

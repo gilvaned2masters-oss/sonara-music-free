@@ -83,6 +83,21 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const order = {
     paymentId, customerId, externalReference, provider: 'asaas', paymentMethod: 'pix',
     name, email, phone, cpf, value, paid: false, status: 'PENDING',
+    // Preserve the creation form used by the generation worker.  The webhook
+    // must receive the same order context that was supplied before the PIX
+    // was generated; otherwise a paid automatic order has no lyrics to create.
+    source: text(input, 'source', 40) || 'auto',
+    brief: text(input, 'brief', 5000),
+    savedLetra: text(input, 'savedLetra', 12000),
+    sunorStyle: text(input, 'sunorStyle', 400),
+    destinatario: text(input, 'destinatario', 120),
+    relacao: text(input, 'relacao', 120),
+    ocasiao: text(input, 'ocasiao', 120),
+    estilo: text(input, 'estilo', 200),
+    voz: text(input, 'voz', 80),
+    lyricsSource: text(input, 'lyricsSource', 80),
+    lyricsTitle: text(input, 'lyricsTitle', 240),
+    lang: text(input, 'lang', 8),
     orderBumpExtraVersion: bumpVersion, orderBumpExtraSongs: bumpSongs,
     orderBumpVideo: bumpVideo, orderBumpQrCode: bumpQrCode, orderBumpBackOffer: backOffer,
     fbp: text(attribution, 'fbp', 180), fbc: text(attribution, 'fbc', 260),

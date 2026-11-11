@@ -1191,7 +1191,7 @@ function populateModal(o) {
   document.getElementById('btn-edit-letra').textContent = '✏ Editar';
 
   // Tab 5 - Producao
-  var deliveryUrl = o.paymentId ? ('https://mastersmusic.com.br/pronto/?id=' + o.paymentId) : '';
+  var deliveryUrl = o.paymentId ? ('https://sonara-music-ewu.pages.dev/pronto/?id=' + o.paymentId) : '';
   document.getElementById('f-delivery-url').textContent = deliveryUrl || '(sem ID de pedido)';
   var openLink = document.getElementById('f-delivery-open');
   if (deliveryUrl) { openLink.href = deliveryUrl; openLink.style.opacity = '1'; openLink.style.pointerEvents = ''; }
@@ -1572,7 +1572,7 @@ function sendMusicEmail() {
 function sendDeliveryWhatsApp() {
   if (!currentOrder) return;
   var pid = currentOrder.paymentId || '';
-  var deliveryUrl = pid ? ('https://mastersmusic.com.br/pronto/?id=' + pid) : '';
+  var deliveryUrl = pid ? ('https://sonara-music-ewu.pages.dev/pronto/?id=' + pid) : '';
   if (!deliveryUrl) { toast('Sem ID de pedido', 'err'); return; }
   var b = parseBrief(currentOrder.brief || '');
   var nome = (currentOrder.name || '').split(' ')[0];
@@ -1781,7 +1781,7 @@ function buildQrCard(para, de, tema, qrDataUrl) {
     // Divisor
     + '<div style="height:1px;background:rgba(255,255,255,.12);margin-bottom:14px"></div>'
     // Footer
-    + '<div style="font-size:10px;color:rgba(255,255,255,.35);letter-spacing:2px;text-transform:uppercase">mastersmusic.com.br</div>'
+    + '<div style="font-size:10px;color:rgba(255,255,255,.35);letter-spacing:2px;text-transform:uppercase">sonara-music-ewu.pages.dev</div>'
     + '</div>';
 }
 
@@ -1794,7 +1794,7 @@ function abrirQrCard() {
   var para = b['Para quem'] || '-';
   var de = (currentOrder && currentOrder.name) ? currentOrder.name.split(' ')[0] : '-';
   var pid = currentOrder ? currentOrder.paymentId : '';
-  var playerUrl = pid ? ('https://mastersmusic.com.br/pronto/?id=' + pid) : link;
+  var playerUrl = pid ? ('https://sonara-music-ewu.pages.dev/pronto/?id=' + pid) : link;
   _qrTema = detectarTema(b);
 
   // Preenche campos editáveis
@@ -1911,7 +1911,7 @@ function compartilharQrCard() {
   var phone = currentOrder ? (currentOrder.phone||'').replace(/\D/g,'') : '';
   if (phone && !phone.startsWith('55')) phone = '55' + phone;
   var pid = currentOrder ? currentOrder.paymentId : '';
-  var playerUrl = pid ? ('https://mastersmusic.com.br/pronto/?id=' + pid) : document.getElementById('f-link').value.trim();
+  var playerUrl = pid ? ('https://sonara-music-ewu.pages.dev/pronto/?id=' + pid) : document.getElementById('f-link').value.trim();
   var msg = 'Olá ' + nome + '! 🎵 Sua música personalizada está pronta!\n\nAbra o link abaixo para ouvir:\n\n' + playerUrl + '\n\nFoi criada com muito carinho para ' + para + ' 💜\n\n— Masters Music';
   var wa = 'https://wa.me/' + phone + '?text=' + encodeURIComponent(msg);
   window.open(wa, '_blank');

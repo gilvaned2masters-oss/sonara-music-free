@@ -149,7 +149,7 @@ export function buildRecoveryEmail(order: Record<string, unknown>, pixPayload: s
         <!-- Footer -->
         <tr><td align="center" style="padding-top:20px">
           <p style="margin:0;font-size:12px;color:#9b8ec4;line-height:1.8">
-            Masters Music · <a href="https://mastersmusic.com.br" style="color:#7c5cbf;text-decoration:none">mastersmusic.com.br</a><br>
+            Masters Music · <a href="https://sonara-music-ewu.pages.dev" style="color:#7c5cbf;text-decoration:none">sonara-music-ewu.pages.dev</a><br>
             Você recebeu este email porque iniciou um pedido em nosso site.<br>
             <span style="color:#c9a8ff">Atendimento: 07:00 às 21:00 todos os dias.</span>
           </p>
@@ -193,7 +193,7 @@ export function buildMusicDeliveryEmail(order: Record<string, unknown>, musicLin
           ${waUrl ? `<a href="${waUrl}" style="display:block;text-align:center;background:linear-gradient(135deg,#25d366,#128c7e);color:#fff;font-weight:800;font-size:15px;padding:14px 24px;border-radius:10px;text-decoration:none">📲 Falar no WhatsApp</a>` : ''}
         </td></tr>
         <tr><td align="center" style="padding-top:20px">
-          <p style="margin:0;font-size:12px;color:#4a3d6a">Masters Music · mastersmusic.com.br</p>
+          <p style="margin:0;font-size:12px;color:#4a3d6a">Masters Music · sonara-music-ewu.pages.dev</p>
         </td></tr>
       </table>
     </td></tr>
@@ -220,7 +220,7 @@ function emailWrapper(content: string): string {
         </td></tr>
         <tr><td align="center" style="padding-top:20px">
           <p style="margin:0;font-size:12px;color:#4a3d6a;line-height:1.6">
-            Masters Music · mastersmusic.com.br<br>
+            Masters Music · sonara-music-ewu.pages.dev<br>
             Suporte? Fale pelo WhatsApp se precisar de ajuda.
           </p>
         </td></tr>
@@ -258,7 +258,7 @@ export function buildConfirmationEmail(order: Record<string, unknown>, ownerWhat
     .map(p => `<tr><td style="padding:6px 0;font-size:14px;color:#d4b8ff;border-bottom:1px solid #2a2040">${p}</td></tr>`)
     .join('');
 
-  const prontoUrl = `https://mastersmusic.com.br/pronto?id=${paymentId}`;
+  const prontoUrl = `https://sonara-music-ewu.pages.dev/pronto?id=${paymentId}`;
 
   const ctaAuto = `
     <p style="margin:0 0 8px;font-size:14px;color:#9b8ec4;text-align:center;line-height:1.6">
@@ -305,13 +305,13 @@ export function buildDeliveryEmail(order: Record<string, unknown>, ownerWhatsapp
   const paymentId = String(order['paymentId'] ?? '');
   const value     = Number(order['value'] ?? 29.9).toFixed(2).replace('.', ',');
   const waUrl     = buildWaSupport(ownerWhatsapp ?? '', String(order['name'] ?? ''), paymentId, value);
-  const prontoUrl = `https://mastersmusic.com.br/pronto?id=${paymentId}`;
+  const prontoUrl = `https://sonara-music-ewu.pages.dev/pronto?id=${paymentId}`;
   // Nº de versões compradas: base 1 + versão extra (+1) + 2 músicas extras (+2) → 1 a 4.
   // Suno sempre gera 2 áudios por task, mas só anunciamos o que o cliente realmente comprou.
   const versions  = Math.min(1 + (order['orderBumpExtraVersion'] ? 1 : 0) + (order['orderBumpExtraSongs'] ? 2 : 0), 4);
   const hasMulti  = versions > 1;
   const hasQr     = !!order['orderBumpQrCode'];
-  const qrUrl     = `https://mastersmusic.com.br/qr?id=${paymentId}`;
+  const qrUrl     = `https://sonara-music-ewu.pages.dev/qr?id=${paymentId}`;
 
   const qrSection = hasQr ? `
     <div style="background:#0f0d1a;border:1px solid #3a2060;border-radius:12px;padding:20px;margin-bottom:20px;text-align:center">
@@ -340,7 +340,7 @@ export function buildDeliveryEmail(order: Record<string, unknown>, ownerWhatsapp
     <div style="margin-top:22px;padding-top:18px;border-top:1px solid #2a2040;text-align:center">
       <p style="margin:0 0 6px;font-size:14px;font-weight:700;color:#d4b8ff">🎁 Ganhe músicas grátis</p>
       <p style="margin:0 0 12px;font-size:13px;color:#9b8ec4;line-height:1.5">Indique amigos: a cada 3 que comprarem, você ganha 1 música grátis. Veja seus pedidos e seu link de indicação na sua conta.</p>
-      <a href="https://mastersmusic.com.br/conta" style="display:inline-block;background:#1a1228;border:1px solid #7c5cbf;color:#c9a8ff;font-weight:700;font-size:14px;padding:11px 22px;border-radius:10px;text-decoration:none">👤 Acessar minha conta</a>
+      <a href="https://sonara-music-ewu.pages.dev/conta" style="display:inline-block;background:#1a1228;border:1px solid #7c5cbf;color:#c9a8ff;font-weight:700;font-size:14px;padding:11px 22px;border-radius:10px;text-decoration:none">👤 Acessar minha conta</a>
     </div>
   `;
 
@@ -354,7 +354,7 @@ export function buildDeliveryEmailES(order: Record<string, unknown>, ownerWhatsa
   const paymentId = String(order['paymentId'] ?? '');
   const value     = Number(order['value'] ?? 27).toFixed(2).replace('.', ',');
   const waUrl     = buildWaSupport(ownerWhatsapp ?? '', String(order['name'] ?? ''), paymentId, value);
-  const prontoUrl = `https://mastersmusic.com.br/pronto?id=${paymentId}`;
+  const prontoUrl = `https://sonara-music-ewu.pages.dev/pronto?id=${paymentId}`;
   const versions  = Math.min(1 + (order['orderBumpExtraVersion'] ? 1 : 0) + (order['orderBumpExtraSongs'] ? 2 : 0), 4);
   const hasMulti  = versions > 1;
 
@@ -383,7 +383,7 @@ export function buildConfirmationEmailES(order: Record<string, unknown>, ownerWh
   const paymentId = String(order['paymentId'] ?? ref);
   const value     = Number(order['value'] ?? 27).toFixed(2).replace('.', ',');
   const waUrl     = buildWaSupport(ownerWhatsapp ?? '', String(order['name'] ?? ''), paymentId, value);
-  const prontoUrl = `https://mastersmusic.com.br/pronto?id=${paymentId}`;
+  const prontoUrl = `https://sonara-music-ewu.pages.dev/pronto?id=${paymentId}`;
 
   const content = `
     <p style="margin:0 0 8px;font-size:22px;font-weight:800;color:#fff">¡Pago confirmado! 🎉</p>
@@ -435,9 +435,9 @@ export function buildAnnouncementEmail(firstName?: string): string {
       <p style="margin:0 0 6px;font-size:15px;font-weight:800;color:#a855f7">🎁 Indique e ganhe músicas grátis</p>
       <p style="margin:0;font-size:14px;color:#c9b8e8;line-height:1.6">A cada <strong style="color:#fff">3 amigos</strong> que comprarem pelo seu link, você ganha <strong style="color:#fff">1 música grátis</strong>!</p>
     </div>
-    <a href="https://mastersmusic.com.br/conta" style="display:block;text-align:center;background:linear-gradient(135deg,#7c5cbf,#a855f7);color:#fff;font-weight:800;font-size:16px;padding:16px 24px;border-radius:12px;text-decoration:none;letter-spacing:0.3px;margin-bottom:14px">👤 Acessar minha conta</a>
+    <a href="https://sonara-music-ewu.pages.dev/conta" style="display:block;text-align:center;background:linear-gradient(135deg,#7c5cbf,#a855f7);color:#fff;font-weight:800;font-size:16px;padding:16px 24px;border-radius:12px;text-decoration:none;letter-spacing:0.3px;margin-bottom:14px">👤 Acessar minha conta</a>
     <p style="margin:0;font-size:12px;color:#6b5a8a;text-align:center;line-height:1.6">
-      Acesse com o email desta mensagem em <strong style="color:#9b8ec4">mastersmusic.com.br/conta</strong> — é só pedir o código de acesso.
+      Acesse com o email desta mensagem em <strong style="color:#9b8ec4">sonara-music-ewu.pages.dev/conta</strong> — é só pedir o código de acesso.
     </p>
   `;
   return emailWrapper(content);

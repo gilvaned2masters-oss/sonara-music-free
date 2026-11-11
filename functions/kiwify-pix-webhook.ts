@@ -215,7 +215,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
           const html = `<div style="font-family:sans-serif;max-width:480px;margin:auto">
             <h2 style="color:#7c3aed">🎉 Você ganhou uma música grátis!</h2>
             <p>Olá, ${nome}! Suas indicações na Masters Music renderam — você completou ${r.earned! * 3} amigos que compraram e ganhou <b>${r.earned} música(s) grátis</b>.</p>
-            <p>Acesse seu painel pra resgatar: <a href="https://mastersmusic.com.br/indique?c=${r.ownerCode}">mastersmusic.com.br/indique</a></p>
+            <p>Acesse seu painel pra resgatar: <a href="https://sonara-music-ewu.pages.dev/indique?c=${r.ownerCode}">sonara-music-ewu.pages.dev/indique</a></p>
             <p style="color:#888;font-size:13px">Continue indicando: a cada 3 amigos que comprarem, +1 música grátis. 💜</p>
           </div>`;
           context.waitUntil(sendEmail(env.RESEND_API_KEY, env.FROM_EMAIL || 'noreply@mastersmusic.com.br', {

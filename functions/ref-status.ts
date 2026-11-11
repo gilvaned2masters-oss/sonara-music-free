@@ -27,5 +27,5 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
 
   const st = await getOwnerStatus(env.ORDERS_KV, key);
   if (!st) return json({ ok: false, error: 'not_found' }, 404);
-  return json({ ok: true, ...st, link: `https://mastersmusic.com.br/?ref=${st.codigo}` });
+  return json({ ok: true, ...st, link: `https://sonara-music-ewu.pages.dev/?ref=${st.codigo}` });
 };
