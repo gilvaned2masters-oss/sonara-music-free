@@ -61,8 +61,11 @@ function claim(txid) {
 }
 
 const server = http.createServer(async (req, res) => {
-  if (!authenticated(req)) return json(res, 401, { ok: false });
   const url = new URL(req.url || '/', 'http://bridge.local');
+  // This endpoint contains no account, payment or credential data. It allows
+  // the Sonara-only Nginx vhost to verify the isolated bridge locally.
+  if (req.method === 'GET' && url.pathname === '/health') return json(res, 200, { ok: true, service: 'sonara-efi' });
+  if (!authenticated(req)) return json(res, 401, { ok: false });
   try {
     if (req.method === 'POST' && url.pathname === '/v1/pix') {
       const body = await readBody(req), txid = String(body.txid || ''), value = Number(body.value || 0);
