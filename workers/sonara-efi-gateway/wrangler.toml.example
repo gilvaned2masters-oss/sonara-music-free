@@ -1,0 +1,21 @@
+name = "sonara-efi-gateway"
+main = "src/index.ts"
+compatibility_date = "2024-09-23"
+workers_dev = true
+
+# Set the actual certificate ID only after uploading a Sonara-dedicated PEM/key
+# through `wrangler mtls-certificate upload`. Do not use the Nail certificate.
+[[mtls_certificates]]
+binding = "EFI_MTLS"
+certificate_id = "REPLACE_WITH_SONARA_MTLS_CERTIFICATE_ID"
+
+[[durable_objects.bindings]]
+name = "SONARA_ACTIVATIONS"
+class_name = "SonaraActivationLock"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["SonaraActivationLock"]
+
+[triggers]
+crons = ["* * * * *"]

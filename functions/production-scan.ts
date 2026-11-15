@@ -22,7 +22,8 @@ function equalSecret(left: string, right: string): boolean {
 
 /**
  * Continues Sonara-only generation and delivery without a buyer's browser.
- * This is intentionally a separate authenticated endpoint so it cannot run
+ * This is intentionally a separate authenticated endpoint called by the
+ * Cloudflare Cron Worker so it cannot run
  * from public traffic and has no relationship to Nail's webhook or services.
  */
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {

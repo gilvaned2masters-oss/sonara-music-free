@@ -19,7 +19,7 @@ function equalSecret(left: string, right: string): boolean {
   return diff === 0 && a.length > 0;
 }
 
-/** Called only by the Sonara systemd timer; it never accepts browser input. */
+/** Called only by the Sonara Cloudflare Cron Worker; it never accepts browser input. */
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const supplied = request.headers.get('Authorization')?.replace(/^Bearer\s+/i, '') ?? '';
   if (!equalSecret(supplied, env.SONARA_SETTLEMENT_TOKEN || '')) return json({ ok: false }, 401);
