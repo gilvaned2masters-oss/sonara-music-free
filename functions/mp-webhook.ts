@@ -98,6 +98,9 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     return json({ ok: true });
   }
 
+  // Histórico somente: não aceita confirmação Mercado Pago para pedidos Efí.
+  if (order['provider'] !== 'mercadopago') return json({ ok: true, ignored: 'legacy_provider_mismatch' });
+
   if (order['paid']) return json({ ok: true }); // já processado
 
   order['paid']       = true;

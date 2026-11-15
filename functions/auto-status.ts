@@ -6,8 +6,9 @@ import {
   startKieGeneration, pollKieTasks,
 } from './_shared/generation';
 import { storeMp3ToR2 } from './_shared/audio-store';
+import { shouldRetryDeliveryEmail } from './_shared/activation-guards';
 
-interface Env {
+export interface AutoStatusEnv {
   ORDERS_KV: KVNamespace;
   // R2 is optional while the Pages project is being brought online.  When it
   // is not bound yet, delivery still completes with the provider URL instead
@@ -25,7 +26,7 @@ interface Env {
 
 // Baixa as músicas (URLs externas) e as guarda no R2, devolvendo /audio/{id}.
 // URLs do KIE expiram; o R2 (nosso domínio) é permanente.
-async function toR2(env: Env, paymentId: string, urls: string[]): Promise<string[]> {
+async function toR2(env: AutoStatusEnv, paymentId: string, urls: string[]): Promise<string[]> {
   if (!env.AUDIO_BUCKET) return urls;
   const out: string[] = [];
   for (let i = 0; i < urls.length; i++) {
@@ -80,7 +81,7 @@ function json(data: unknown, status = 200): Response {
 // Finaliza: grava URLs (sempre no R2, nunca em CDN externo que pode expirar),
 // marca sucesso e envia email de entrega.
 async function finalize(
-  env: Env, paymentId: string, order: Record<string, unknown>, urls: string[],
+  env: AutoStatusEnv, paymentId: string, order: Record<string, unknown>, urls: string[],
 ): Promise<Response> {
   const r2urls = await toR2(env, paymentId, urls); // baixa do Sunor/KIE → R2 (idempotente)
   saveMp3Urls(order, r2urls);
@@ -110,17 +111,10 @@ async function finalize(
   return json({ ok: true, paid: true, status: 'success', ...orderMeta(order) });
 }
 
-export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
-  const url = new URL(request.url);
-  const paymentId = (url.searchParams.get('paymentId') ?? '').replace(/[^a-zA-Z0-9_.-]/g, '');
-
-  if (!paymentId) return json({ ok: false, error: 'missing_paymentId' }, 400);
-
-  const raw = env.ORDERS_KV ? await env.ORDERS_KV.get('order:' + paymentId) : null;
-  if (!raw) return json({ ok: false, error: 'not_found' }, 404);
-
-  const order = JSON.parse(raw) as Record<string, unknown>;
-
+/** Shared by customer polling and the authenticated background scanner. */
+export async function refreshAutoOrder(
+  env: AutoStatusEnv, paymentId: string, order: Record<string, unknown>, origin: string,
+): Promise<Response> {
   if (!order['paid']) {
     return json({ ok: true, paid: false, status: 'waiting_payment' });
   }
@@ -130,7 +124,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   // ── Resultado já entregue (cacheado no KV) ────────────────────────────────
   if (order['treblo_status'] === 'success' && collectMp3Urls(order).length >= versions) {
     // Retry email caso não tenha saído antes
-    if (!order['deliveryEmailSent'] && env.RESEND_API_KEY && order['email']) {
+    if (shouldRetryDeliveryEmail(order, Boolean(env.RESEND_API_KEY))) {
       const html = deliveryHtml(order, env.OWNER_WHATSAPP);
       const sent = await sendEmail(env.RESEND_API_KEY, env.FROM_EMAIL || 'noreply@mastersmusic.com.br', {
         to: String(order['email']),
@@ -152,12 +146,13 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const createdAt = new Date(String(order['created_at'] ?? 0)).getTime();
   const minutos   = (Date.now() - createdAt) / 60000;
   const need      = tasksNeeded(order);
+  const generationRetries = Number(order['generationRetryCount'] ?? 0);
 
   // ── Modo KIE (fallback já acionado): poll de todas as tasks KIE ───────────
   if (kieTaskIds(order).length && env.KIE_API_KEY) {
     // Dispara tasks KIE que ainda faltam (ex.: 4 versões, só 1 task criada)
     if (need > kieTaskIds(order).length) {
-      await startKieGeneration(env.ORDERS_KV, env.KIE_API_KEY, url.origin, paymentId, order);
+      await startKieGeneration(env.ORDERS_KV, env.KIE_API_KEY, origin, paymentId, order);
     }
     const { state, urls } = await pollKieTasks(env.KIE_API_KEY, kieTaskIds(order));
     if (state === 'success' && urls.length >= versions) return finalize(env, paymentId, order, urls);
@@ -166,7 +161,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   }
 
   // ── Garantir que as tasks Sunor necessárias foram disparadas ──────────────
-  if (env.SUNOR_API_KEY && need > sunorTaskIds(order).length) {
+  if (env.SUNOR_API_KEY && need > sunorTaskIds(order).length && generationRetries < 8) {
     const lyrics = String(order['savedLetra'] || '');
     if (!lyrics && !sunorTaskIds(order).length) {
       // Sem letra e sem task: nada a gerar
@@ -178,10 +173,21 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
 
   if (!sunorTaskIds(order).length) {
     // Sunor não conseguiu criar task (ex.: 502 do lado deles). Cai pro KIE antes de desistir.
-    if (env.KIE_API_KEY && !kieTaskIds(order).length) {
-      await startKieGeneration(env.ORDERS_KV, env.KIE_API_KEY, url.origin, paymentId, order);
+    if (env.KIE_API_KEY && !kieTaskIds(order).length && generationRetries < 8) {
+      await startKieGeneration(env.ORDERS_KV, env.KIE_API_KEY, origin, paymentId, order);
     }
     if (kieTaskIds(order).length) return json({ ok: true, paid: true, status: 'generating' });
+    if (generationRetries >= 8) {
+      order['prodStatus'] = 'generation_failed';
+      order['updated_at'] = new Date().toISOString();
+      await kvPutOrder(env.ORDERS_KV, paymentId, order);
+      console.error('[auto-status] generation retries exhausted', paymentId);
+      return json({ ok: true, paid: true, status: 'failed' });
+    }
+    order['generationRetryCount'] = generationRetries + 1;
+    order['prodStatus'] = 'generation_retry';
+    order['updated_at'] = new Date().toISOString();
+    await kvPutOrder(env.ORDERS_KV, paymentId, order);
     if (minutos > 20) return json({ ok: true, paid: true, status: 'failed' });
     return json({ ok: true, paid: true, status: 'queued' });
   }
@@ -211,7 +217,19 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   // ── Sunor falhou (sem áudio) → fallback KIE ───────────────────────────────
   console.log('[auto-status] Sunor falhou, ativando KIE fallback para:', paymentId);
   if (env.KIE_API_KEY && !kieTaskIds(order).length) {
-    await startKieGeneration(env.ORDERS_KV, env.KIE_API_KEY, url.origin, paymentId, order);
+    await startKieGeneration(env.ORDERS_KV, env.KIE_API_KEY, origin, paymentId, order);
   }
   return json({ ok: true, paid: true, status: 'generating' });
+}
+
+export const onRequestGet: PagesFunction<AutoStatusEnv> = async ({ request, env }) => {
+  const url = new URL(request.url);
+  const paymentId = (url.searchParams.get('paymentId') ?? '').replace(/[^a-zA-Z0-9_.-]/g, '');
+  if (!paymentId) return json({ ok: false, error: 'missing_paymentId' }, 400);
+  const raw = env.ORDERS_KV ? await env.ORDERS_KV.get('order:' + paymentId) : null;
+  if (!raw) return json({ ok: false, error: 'not_found' }, 404);
+  let order: Record<string, unknown>;
+  try { order = JSON.parse(raw) as Record<string, unknown>; }
+  catch { return json({ ok: false, error: 'invalid_order' }, 500); }
+  return refreshAutoOrder(env, paymentId, order, url.origin);
 };

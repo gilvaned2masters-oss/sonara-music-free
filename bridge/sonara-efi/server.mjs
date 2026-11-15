@@ -6,6 +6,7 @@ import http from 'node:http';
 import https from 'node:https';
 import fs from 'node:fs';
 import path from 'node:path';
+import { timingSafeEqual } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
 
 const required = ['EFI_CLIENT_ID', 'EFI_CLIENT_SECRET', 'EFI_PIX_KEY', 'EFI_P12_PATH', 'EFI_BRIDGE_TOKEN'];
@@ -46,7 +47,11 @@ async function token() {
 }
 async function efi(method, pathname, body) { return requestEfi(method, pathname, body, await token()); }
 function readBody(req) { return new Promise((resolve, reject) => { let raw = ''; req.setEncoding('utf8'); req.on('data', c => { raw += c; if (raw.length > 20_000) req.destroy(); }); req.on('end', () => { try { resolve(raw ? JSON.parse(raw) : {}); } catch { reject(new Error('invalid_json')); } }); req.on('error', reject); }); }
-function authenticated(req) { return req.headers.authorization === `Bearer ${process.env.EFI_BRIDGE_TOKEN}`; }
+function authenticated(req) {
+  const actual = Buffer.from(String(req.headers.authorization || ''));
+  const expected = Buffer.from(`Bearer ${process.env.EFI_BRIDGE_TOKEN}`);
+  return actual.length === expected.length && timingSafeEqual(actual, expected);
+}
 function claim(txid) {
   const now = Date.now(), current = db.prepare('SELECT state, leased_at FROM activations WHERE txid = ?').get(txid);
   if (current?.state === 'completed') return 'completed';
@@ -72,7 +77,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && statusMatch) {
       const txid = statusMatch[1]; if (!isSonaraTxid(txid)) return json(res, 404, { ok: false });
       const cob = await efi('GET', `/v2/cob/${encodeURIComponent(txid)}`); if (!cob.ok) return json(res, 502, { ok: false, error: 'efi_status_failed' });
-      const status = String(cob.data?.status || 'ATIVA'); return json(res, 200, { ok: true, txid, status, paid: status === 'CONCLUIDA', paidAt: String(cob.data?.pix?.[0]?.horario || '') || null });
+      const status = String(cob.data?.status || 'ATIVA'); return json(res, 200, { ok: true, txid, status, paid: status === 'CONCLUIDA', paidAt: String(cob.data?.pix?.[0]?.horario || '') || null, value: Number(cob.data?.valor?.original) || null });
     }
     const activationMatch = url.pathname.match(/^\/v1\/activation\/([A-Za-z0-9]+)\/(claim|complete)$/);
     if (req.method === 'POST' && activationMatch) {

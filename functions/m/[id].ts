@@ -1,3 +1,5 @@
+import { getPricing } from '../_shared/pricing';
+
 interface Env { ORDERS_KV: KVNamespace; }
 
 function html(content: string, cache = 60): Response {
@@ -63,6 +65,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   if (!raw) return notFoundPage();
 
   const order = JSON.parse(raw) as Record<string, unknown>;
+  const artPriceLabel = (await getPricing(context.env.ORDERS_KV)).art.toFixed(2).replace('.', ',');
 
   // Prioridade: audioUrl (Kie.ai) → mp3_url (Sunor) → musicLink (upload manual)
   const audioUrl  = String(order['audioUrl']  || order['mp3_url'] || order['musicLink'] || '');
@@ -300,7 +303,7 @@ body{background:${theme.bg};color:#fff;display:flex;flex-direction:column;align-
         <div class="lyrics-canvas-text">${esc(letraLimpa)}</div>
         <div class="lyrics-watermark" id="artWatermark"><span>PRÉVIA</span></div>
       </div>
-      <button class="bump-btn" id="artBuyBtn" onclick="handleArtBuy()">🎨 Comprar arte por R$9,00</button>
+      <button class="bump-btn" id="artBuyBtn" onclick="handleArtBuy()">🎨 Comprar arte por R$${artPriceLabel}</button>
       <button class="bump-btn-outline" id="artDlBtn" onclick="downloadArt()">⬇ Baixar arte da letra</button>
     </div>
   </div>` : ''}
@@ -369,7 +372,7 @@ body{background:${theme.bg};color:#fff;display:flex;flex-direction:column;align-
   <div id="artPixModal" style="display:none;position:fixed;inset:0;z-index:999;background:rgba(0,0,0,.88);align-items:center;justify-content:center;padding:20px">
     <div style="background:#1a1228;border:1px solid ${theme.accent}55;border-radius:22px;padding:28px;width:100%;max-width:360px;text-align:center">
       <div style="font-size:28px;margin-bottom:8px">🎨</div>
-      <div style="font-size:18px;font-weight:900;color:#fff;margin-bottom:4px">Arte da letra — R$9,00</div>
+      <div style="font-size:18px;font-weight:900;color:#fff;margin-bottom:4px">Arte da letra — R$${artPriceLabel}</div>
       <div style="font-size:13px;color:rgba(255,255,255,.5);margin-bottom:18px">Escaneie o QR ou copie o código PIX</div>
       <img id="artPixQr" src="" alt="QR Code" style="width:190px;height:190px;border-radius:14px;margin-bottom:16px;background:#fff;padding:8px;display:block;margin-left:auto;margin-right:auto">
       <input id="artPixPayload" readonly style="display:none">
@@ -461,7 +464,7 @@ function handleArtBuy(){
   .then(function(d){
     if(d.alreadyPaid){unlockArt();return;}
     if(!d.ok||!d.payload){
-      if(btn){btn.disabled=false;btn.textContent='🎨 Comprar arte por R\$9,00';}
+       if(btn){btn.disabled=false;btn.textContent='🎨 Comprar arte por R\$${artPriceLabel}';}
       alert('Erro ao gerar PIX. Tente novamente.');return;
     }
     artPaymentId=d.paymentId;
@@ -469,7 +472,7 @@ function handleArtBuy(){
     startArtPolling();
   })
   .catch(function(){
-    if(btn){btn.disabled=false;btn.textContent='🎨 Comprar arte por R\$9,00';}
+     if(btn){btn.disabled=false;btn.textContent='🎨 Comprar arte por R\$${artPriceLabel}';}
     alert('Erro de conexão. Tente novamente.');
   });
 }
@@ -489,7 +492,7 @@ function closeArtPix(){
   if(modal)modal.style.display='none';
   if(artPollTimer){clearInterval(artPollTimer);artPollTimer=null;}
   var btn=document.getElementById('artBuyBtn');
-  if(btn&&!artUnlocked){btn.disabled=false;btn.textContent='🎨 Comprar arte por R\$9,00';}
+  if(btn&&!artUnlocked){btn.disabled=false;btn.textContent='🎨 Comprar arte por R\$${artPriceLabel}';}
 }
 
 function copyArtPix(){

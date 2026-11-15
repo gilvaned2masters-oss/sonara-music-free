@@ -1,5 +1,6 @@
 import { createEfiPix, getEfiPixStatus, newSonaraTxid, type EfiBridgeEnv } from './_shared/efi-bridge';
 import { kvPutOrder } from './_shared/kv-helpers';
+import { getPricing } from './_shared/pricing';
 
 interface Env extends EfiBridgeEnv { ORDERS_KV: KVNamespace; }
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
@@ -25,9 +26,10 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     }
   }
 
-  const charge = await createEfiPix(env, { txid: newSonaraTxid('sma'), value: 9, expiration: 1800, reference: `art-${orderId}`, description: 'Sonara Music — arte personalizada' });
+  const artPrice = (await getPricing(env.ORDERS_KV)).art;
+  const charge = await createEfiPix(env, { txid: newSonaraTxid('sma'), value: artPrice, expiration: 1800, reference: `art-${orderId}`, description: 'Sonara Music — arte personalizada' });
   if (!charge.ok || !charge.data) return json({ ok: false, error: 'payment_failed' }, 502);
-  order.artPaymentId = charge.data.txid; order.artTxid = charge.data.txid; order.artProvider = 'efi'; order.updated_at = new Date().toISOString();
+  order.artPaymentId = charge.data.txid; order.artTxid = charge.data.txid; order.artProvider = 'efi'; order.artValue = artPrice; order.updated_at = new Date().toISOString();
   await kvPutOrder(env.ORDERS_KV, orderId, order);
   return json({ ok: true, paymentId: charge.data.txid, encodedImage: charge.data.encodedImage, payload: charge.data.payload, expirationDate: charge.data.expiresAt });
 };

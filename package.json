@@ -4,7 +4,8 @@
   "scripts": {
     "dev": "wrangler pages dev public --compatibility-date=2024-09-23",
     "deploy": "wrangler pages deploy public --project-name=masters-music",
-    "types": "wrangler types"
+    "types": "wrangler types",
+    "test:efi": "node --test tests/efi-settlement-core.test.mjs"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20241205.0",

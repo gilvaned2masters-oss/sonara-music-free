@@ -2,6 +2,7 @@ import { sendMetaCapiPurchase } from './meta-capi';
 import { sendEmail, buildConfirmationEmail } from './resend';
 import { kvPutOrder } from './kv-helpers';
 import { startKieGeneration, startSunorGeneration } from './generation';
+import { shouldStartAutoGeneration } from './activation-guards';
 
 export interface PaymentActivationEnv {
   ORDERS_KV: KVNamespace;
@@ -74,6 +75,8 @@ export async function activatePaidOrder(
       order['orderBumpExtraSongs'] ? '🎵 +2 músicas' : '',
       order['orderBumpExtraVersion'] ? '➕ Versão extra' : '',
       order['orderBumpQrCode'] ? '📲 QR Code' : '',
+      order['orderBumpSpotify'] ? '🎧 Spotify' : '',
+      order['orderBumpPlayback'] ? '▶️ Playback' : '',
     ].filter(Boolean).join(' · ');
     const auth = 'Basic ' + btoa(':' + (env.ADMIN_PASSWORD || ''));
     fetch(origin + '/push-notify', {
@@ -103,7 +106,20 @@ export async function activatePaidOrder(
     }
   }
 
-  if (order['source'] === 'auto' && !order['sunor_task_id'] && !order['kie_task_id'] && !order['sunorStartRequested'] && (env.SUNOR_API_KEY || env.KIE_API_KEY)) {
+  // These are fulfillment tasks, not automatic music-generation variants.
+  // They remain visible in the admin order until a human completes delivery.
+  if (order['orderBumpSpotify'] === true && !order['spotifyPending']) {
+    order['spotifyPending'] = true;
+    order['updated_at'] = new Date().toISOString();
+    await kvPutOrder(env.ORDERS_KV, paymentId, order);
+  }
+  if (order['orderBumpPlayback'] === true && !order['playbackPending']) {
+    order['playbackPending'] = true;
+    order['updated_at'] = new Date().toISOString();
+    await kvPutOrder(env.ORDERS_KV, paymentId, order);
+  }
+
+  if (shouldStartAutoGeneration(order, Boolean(env.SUNOR_API_KEY || env.KIE_API_KEY))) {
     order['sunorStartRequested'] = true;
     order['prodStatus'] = 'gerando_musica';
     order['updated_at'] = new Date().toISOString();
@@ -111,6 +127,16 @@ export async function activatePaidOrder(
     if (env.SUNOR_API_KEY) await startSunorGeneration(env.ORDERS_KV, env.SUNOR_API_KEY, paymentId, order);
     if (!order['sunor_task_id'] && env.KIE_API_KEY) {
       await startKieGeneration(env.ORDERS_KV, env.KIE_API_KEY, origin, paymentId, order);
+    }
+    // A provider failure before it returns a task must not permanently strand
+    // the paid order. The authenticated background production scanner retries
+    // it; task IDs remain the idempotency markers once a task exists.
+    if (!order['sunor_task_id'] && !order['kie_task_id']) {
+      order['sunorStartRequested'] = false;
+      order['generationRetryCount'] = Math.min(Number(order['generationRetryCount'] ?? 0) + 1, 8);
+      order['prodStatus'] = 'generation_retry';
+      order['updated_at'] = new Date().toISOString();
+      await kvPutOrder(env.ORDERS_KV, paymentId, order);
     }
   }
   return order;

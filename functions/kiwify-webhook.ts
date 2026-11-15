@@ -58,6 +58,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   if (!raw) return json({ ok: true });
 
   const order = JSON.parse(raw) as Record<string, unknown>;
+  // Histórico somente: não aceita confirmação Kiwify para pedidos Efí.
+  if (order['provider'] !== 'kiwify') return json({ ok: true, ignored: 'legacy_provider_mismatch' });
   order['paid'] = true;
   order['status'] = 'PAID';
   order['updated_at'] = new Date().toISOString();

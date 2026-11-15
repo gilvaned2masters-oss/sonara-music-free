@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Sonara Efí settlement scan each minute
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=1min
+Persistent=true
+Unit=sonara-efi-settlement.service
+
+[Install]
+WantedBy=timers.target

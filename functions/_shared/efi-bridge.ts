@@ -8,7 +8,7 @@ export interface EfiBridgeEnv {
 }
 
 export type PixCharge = { txid: string; payload: string; encodedImage: string; expiresAt: string | null };
-export type PixStatus = { txid: string; status: string; paid: boolean; paidAt: string | null };
+export type PixStatus = { txid: string; status: string; paid: boolean; paidAt: string | null; value: number | null };
 type BridgeResult<T> = { ok: boolean; status: number; data: T | null };
 
 function baseUrl(env: EfiBridgeEnv): string { return String(env.EFI_BRIDGE_URL || '').replace(/\/+$/, ''); }

@@ -1,7 +1,6 @@
-import { completePaymentActivation, claimPaymentActivation, getEfiPixStatus, type EfiBridgeEnv } from './_shared/efi-bridge';
-import { activatePaidOrder, type PaymentActivationEnv } from './_shared/payment-activation';
+import { settleEfiOrder, type EfiSettlementEnv } from './_shared/efi-settlement';
 
-interface Env extends EfiBridgeEnv, PaymentActivationEnv {
+interface Env extends EfiSettlementEnv {
   ORDERS_KV: KVNamespace;
 }
 
@@ -25,34 +24,13 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   let status = String(order['status'] ?? 'PENDING');
 
   if (!isPaid) {
-    if (order['provider'] === 'efi') {
-      // A liberação depende de uma segunda confirmação, diretamente na EFI.
-      // O browser nunca é fonte de verdade para pagamento.
-      const res = await getEfiPixStatus(env, String(order['txid'] ?? paymentId));
-      if (res.ok && res.data) {
-        status = res.data.status;
-        isPaid = res.data.paid && status === 'CONCLUIDA';
-      }
-    }
-    if (isPaid) {
-      order['status'] = status;
-      const txid = String(order['txid'] ?? paymentId);
-      const claim = await claimPaymentActivation(env, txid);
-      if (claim.ok && claim.data?.claim === 'acquired') {
-        try {
-          await activatePaidOrder(env, paymentId, order, new URL(request.url).origin);
-          await completePaymentActivation(env, txid);
-        } catch (error) {
-          console.error('[sonara][efi] activation failed', error instanceof Error ? error.message : 'unknown');
-          return json({ ok: false, error: 'activation_pending' }, 503);
-        }
-      } else if (claim.ok && claim.data?.claim === 'busy') {
-        return json({ ok: true, paid: false, status: 'PROCESSING' });
-      } else if (claim.ok && claim.data?.claim === 'completed') {
-        const fresh = await env.ORDERS_KV.get('order:' + paymentId);
-        if (fresh) Object.assign(order, JSON.parse(fresh) as Record<string, unknown>);
-      }
-    }
+    if (order['provider'] !== 'efi') return json({ ok: true, paid: false, status });
+    const result = await settleEfiOrder(env, paymentId, order, new URL(request.url).origin);
+    if (result === 'processing') return json({ ok: true, paid: false, status: 'PROCESSING' });
+    if (result === 'retry') return json({ ok: true, paid: false, status: 'RETRYING' });
+    if (result === 'mismatch') return json({ ok: true, paid: false, status: 'VALIDATION_ERROR' });
+    isPaid = result === 'confirmed';
+    status = String(order['status'] ?? status);
   }
 
   // Retorna apenas o mínimo necessário — sem PII (email, phone, cpf, brief, fbp, fbc, clientIp)

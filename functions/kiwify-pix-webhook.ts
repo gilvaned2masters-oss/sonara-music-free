@@ -117,6 +117,9 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   if (!raw) return json({ ok: true });
   const order = JSON.parse(raw) as Record<string, unknown>;
 
+  // Histórico somente: este endpoint jamais pode confirmar uma cobrança Efí.
+  if (order['provider'] !== 'kiwify') return json({ ok: true, ignored: 'legacy_provider_mismatch' });
+
   if (order['paid']) return json({ ok: true }); // idempotente — já processado
 
   order['paid']          = true;

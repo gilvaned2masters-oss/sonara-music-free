@@ -1,5 +1,5 @@
 import { kvPutOrder } from './_shared/kv-helpers';
-import { getPricing } from './_shared/pricing';
+import { calculateOrderValue, getPricing } from './_shared/pricing';
 import { createEfiPix, newSonaraTxid, type EfiBridgeEnv } from './_shared/efi-bridge';
 
 interface Env extends EfiBridgeEnv {
@@ -35,6 +35,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const bumpSongs = input.orderBumpExtraSongs === true || input.orderBumpExtraSongs === 'true';
   const bumpVideo = input.orderBumpVideo === true || input.orderBumpVideo === 'true';
   const bumpQrCode = input.orderBumpQrCode === true || input.orderBumpQrCode === 'true';
+  const bumpSpotify = input.orderBumpSpotify === true || input.orderBumpSpotify === 'true';
+  const bumpPlayback = input.orderBumpPlayback === true || input.orderBumpPlayback === 'true';
   const backOffer = input.orderBumpBackOffer === true || input.orderBumpBackOffer === 'true';
 
   if (!name || !phone || cpf.length !== 11 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -45,11 +47,10 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   }
 
   const pricing = await getPricing(env.ORDERS_KV);
-  const value = backOffer ? pricing.backOffer : pricing.base
-    + (bumpVersion ? pricing.version : 0)
-    + (bumpSongs ? pricing.songs : 0)
-    + (bumpVideo ? pricing.video : 0)
-    + (bumpQrCode ? pricing.qrcode : 0);
+  const value = calculateOrderValue(pricing, {
+    backOffer, version: bumpVersion, songs: bumpSongs, video: bumpVideo,
+    qrcode: bumpQrCode, spotify: bumpSpotify, playback: bumpPlayback,
+  });
   const externalReference = `sonara-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
 
   // O txid é definido por nós para permitir vincular com segurança a cobrança,
@@ -85,6 +86,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     lang: text(input, 'lang', 8),
     orderBumpExtraVersion: bumpVersion, orderBumpExtraSongs: bumpSongs,
     orderBumpVideo: bumpVideo, orderBumpQrCode: bumpQrCode, orderBumpBackOffer: backOffer,
+    orderBumpSpotify: bumpSpotify, orderBumpPlayback: bumpPlayback,
     fbp: text(attribution, 'fbp', 180), fbc: text(attribution, 'fbc', 260),
     fbclid: text(attribution, 'fbclid', 260), pageUrl: text(attribution, 'pageUrl', 900),
     utmSource: text(attribution, 'utmSource', 120), utmMedium: text(attribution, 'utmMedium', 120),

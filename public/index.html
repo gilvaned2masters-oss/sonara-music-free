@@ -1343,7 +1343,7 @@
     let QR_CODE_BUMP_PRICE = 19.90;
     let SPOTIFY_BUMP_PRICE = 97.90;
     let PLAYBACK_BUMP_PRICE = 19.90;
-    let LETRA_ARTE_BUMP_PRICE = 19.00;      // letra em arte (PDF pra emoldurar)
+    let LETRA_ARTE_BUMP_PRICE = 9.00;       // fallback; servidor usa config:pricing.art
     let PAGINA_PRESENTE_BUMP_PRICE = 19.90; // página do presente com QR code
     let VERSION_POPUP_PRICE = 9.90;   // 2ª versão no popup de saída da letra
     let VIDEO_POPUP_PRICE = 39.90;    // vídeo no popup "antes de pagar"
@@ -1442,7 +1442,7 @@
       VIDEO_BUMP_PRICE=Number(p.video); QR_CODE_BUMP_PRICE=Number(p.qrcode); BACK_OFFER_PRICE=Number(p.backOffer);
       SPOTIFY_BUMP_PRICE=Number(p.spotify || 97.90);
       PLAYBACK_BUMP_PRICE=Number(p.playback || 19.90);
-      if(p.letraArte!=null)      LETRA_ARTE_BUMP_PRICE=Number(p.letraArte);
+      if(p.art!=null)            LETRA_ARTE_BUMP_PRICE=Number(p.art);
       if(p.paginaPresente!=null) PAGINA_PRESENTE_BUMP_PRICE=Number(p.paginaPresente);
       if(p.versionPopup!=null) VERSION_POPUP_PRICE=Number(p.versionPopup);
       if(p.videoPopup!=null)   VIDEO_POPUP_PRICE=Number(p.videoPopup);

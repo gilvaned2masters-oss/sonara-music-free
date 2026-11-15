@@ -17,6 +17,8 @@ export type OrderMeta = {
   bumpSongs: boolean;
   bumpVideo: boolean;
   bumpQrCode: boolean;
+  bumpSpotify: boolean;
+  bumpPlayback: boolean;
   bumpBackOffer: boolean;
   source: string;
   utmSource: string;
@@ -52,6 +54,8 @@ export function extractMeta(order: Record<string, unknown>): OrderMeta {
     bumpSongs:      Boolean(order['orderBumpExtraSongs']),
     bumpVideo:      Boolean(order['orderBumpVideo']),
     bumpQrCode:     Boolean(order['orderBumpQrCode']),
+    bumpSpotify:    Boolean(order['orderBumpSpotify']),
+    bumpPlayback:   Boolean(order['orderBumpPlayback']),
     bumpBackOffer:  Boolean(order['orderBumpBackOffer']),
     source:     String(order['source'] ?? ''),
     utmSource:   trunc(order['utmSource'],   40),
