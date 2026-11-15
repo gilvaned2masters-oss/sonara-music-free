@@ -1,10 +1,9 @@
-import { asaas } from './_shared/asaas';
+import { createEfiPix, newSonaraTxid, type EfiBridgeEnv } from './_shared/efi-bridge';
 import { kvPutOrder } from './_shared/kv-helpers';
 import { sendEmail, buildRecoveryEmail } from './_shared/resend';
 
-interface Env {
+interface Env extends EfiBridgeEnv {
   ORDERS_KV: KVNamespace;
-  ASAAS_API_KEY: string;
   RESEND_API_KEY: string;
   FROM_EMAIL: string;
   OWNER_WHATSAPP: string;
@@ -37,28 +36,22 @@ function subjectFor(stage: number, name: string, title: string): string {
   return `🚨 Última chance, ${name} — não perca sua música`;
 }
 
-// Gera um novo PIX Asaas (códigos PIX expiram) e envia o email do estágio.
+// Gera um novo PIX Efí (códigos Pix expiram) e envia o email do estágio.
 async function sendRecovery(env: Env, paymentId: string, order: Record<string, unknown>, stage: number): Promise<boolean> {
   const now = Date.now();
   const value = Number(order['value'] ?? 39.9);
   let pixPayload = '';
   let encodedImage: string | null = null;
 
-  if (order['customerId'] && env.ASAAS_API_KEY) {
-    const newPay = await asaas(env.ASAAS_API_KEY, 'POST', '/payments', {
-      customer: order['customerId'], billingType: 'PIX', value,
-      dueDate: new Date(now + 86400000).toISOString().slice(0, 10),
-      description: 'Masters Music – recuperação', externalReference: String(order['externalReference'] ?? paymentId),
-    });
-    if (newPay.ok && newPay.data['id']) {
-      const newId = String(newPay.data['id']);
-      const qr2 = await asaas(env.ASAAS_API_KEY, 'GET', `/payments/${encodeURIComponent(newId)}/pixQrCode`);
-      if (qr2.ok && qr2.data['payload']) {
-        pixPayload = String(qr2.data['payload']); encodedImage = String(qr2.data['encodedImage'] ?? '');
-        order['recoveryPaymentId'] = newId;
-        await env.ORDERS_KV.put('ext:' + newId, paymentId, { expirationTtl: 86400 * 7 }).catch(() => {});
-      }
-    }
+  const charge = await createEfiPix(env, {
+    txid: newSonaraTxid('smr'), value, expiration: 1800,
+    reference: String(order['externalReference'] ?? paymentId), description: 'Sonara Music — recuperação de pedido',
+  });
+  if (charge.ok && charge.data?.payload) {
+    pixPayload = charge.data.payload; encodedImage = charge.data.encodedImage;
+    order['recoveryPaymentId'] = charge.data.txid;
+    order['txid'] = charge.data.txid;
+    order['provider'] = 'efi';
   }
 
   if (!pixPayload) { console.log('[pix-recovery] sem payload', paymentId); return false; }

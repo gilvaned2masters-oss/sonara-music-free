@@ -1,10 +1,9 @@
-import { asaas } from './_shared/asaas';
 import { kvPutOrder } from './_shared/kv-helpers';
 import { getPricing } from './_shared/pricing';
+import { createEfiPix, newSonaraTxid, type EfiBridgeEnv } from './_shared/efi-bridge';
 
-interface Env {
+interface Env extends EfiBridgeEnv {
   ORDERS_KV: KVNamespace;
-  ASAAS_API_KEY: string;
 }
 
 function response(data: unknown, status = 200): Response {
@@ -20,7 +19,7 @@ function text(input: Record<string, unknown>, key: string, limit: number): strin
 
 function digits(value: string): string { return value.replace(/\D/g, ''); }
 
-/** Creates one Asaas PIX charge. No fallback gateway is used in this project. */
+/** Creates one EFI PIX charge. No fallback gateway is used in this project. */
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   let input: Record<string, unknown>;
   try { input = await request.json() as Record<string, unknown>; }
@@ -41,7 +40,9 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   if (!name || !phone || cpf.length !== 11 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return response({ ok: false, error: 'missing_customer_fields', message: 'Preencha nome, e-mail, WhatsApp e CPF válidos.' }, 422);
   }
-  if (!env.ASAAS_API_KEY) return response({ ok: false, error: 'gateway_unavailable' }, 503);
+  if (!env.EFI_BRIDGE_URL || !env.EFI_BRIDGE_TOKEN) {
+    return response({ ok: false, error: 'gateway_unavailable', message: 'O pagamento está temporariamente indisponível.' }, 503);
+  }
 
   const pricing = await getPricing(env.ORDERS_KV);
   const value = backOffer ? pricing.backOffer : pricing.base
@@ -51,37 +52,21 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     + (bumpQrCode ? pricing.qrcode : 0);
   const externalReference = `sonara-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
 
-  const customer = await asaas(env.ASAAS_API_KEY, 'POST', '/customers', {
-    name, email, cpfCnpj: cpf, mobilePhone: phone, externalReference, notificationDisabled: true,
+  // O txid é definido por nós para permitir vincular com segurança a cobrança,
+  // o webhook e o pedido salvo. Não use dados do cliente como identificador.
+  const txid = newSonaraTxid();
+  const charge = await createEfiPix(env, {
+    txid, value, expiration: 1800, reference: externalReference,
+    description: 'Sonara Music — música personalizada', cpf, name,
   });
-  const customerId = String(customer.data.id ?? '');
-  if (!customer.ok || !customerId) {
-    console.error('[sonara] customer creation failed', customer.status);
-    return response({ ok: false, error: 'payment_create_failed', message: 'Não foi possível preparar o pagamento agora.' }, 422);
-  }
-
-  const charge = await asaas(env.ASAAS_API_KEY, 'POST', '/payments', {
-    customer: customerId,
-    billingType: 'PIX',
-    value,
-    dueDate: new Date().toISOString().slice(0, 10),
-    description: 'Sonara Music — Música personalizada',
-    externalReference,
-  });
-  const paymentId = String(charge.data.id ?? '');
-  if (!charge.ok || !paymentId) {
-    console.error('[sonara] PIX charge failed', charge.status);
+  const paymentId = String(charge.data?.txid ?? txid);
+  if (!charge.ok || !charge.data?.payload) {
+    console.error('[sonara][efi] PIX charge failed', charge.status);
     return response({ ok: false, error: 'payment_create_failed', message: 'Não foi possível gerar o Pix agora. Tente novamente em instantes.' }, 422);
-  }
-  const qr = await asaas(env.ASAAS_API_KEY, 'GET', `/payments/${encodeURIComponent(paymentId)}/pixQrCode`);
-  const payload = String(qr.data.payload ?? '');
-  if (!qr.ok || !payload) {
-    console.error('[sonara] PIX QR retrieval failed', qr.status);
-    return response({ ok: false, error: 'pix_unavailable', message: 'O Pix está indisponível no momento. Tente novamente em instantes.' }, 422);
   }
 
   const order = {
-    paymentId, customerId, externalReference, provider: 'asaas', paymentMethod: 'pix',
+    paymentId, txid: paymentId, externalReference, provider: 'efi', paymentMethod: 'pix',
     name, email, phone, cpf, value, paid: false, status: 'PENDING',
     // Preserve the creation form used by the generation worker.  The webhook
     // must receive the same order context that was supplied before the PIX
@@ -109,11 +94,12 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
   };
   await kvPutOrder(env.ORDERS_KV, paymentId, order, 86400 * 30);
+  await env.ORDERS_KV.put(`efi:${paymentId}`, paymentId, { expirationTtl: 86400 * 30 });
   await env.ORDERS_KV.put(`ext:${externalReference}`, paymentId, { expirationTtl: 86400 * 30 });
 
   return response({
-    ok: true, paymentId, externalReference, value, provider: 'asaas',
-    encodedImage: String(qr.data.encodedImage ?? ''), payload,
-    expirationDate: String(qr.data.expirationDate ?? '') || null,
+    ok: true, paymentId, externalReference, value, provider: 'efi',
+    encodedImage: charge.data.encodedImage, payload: charge.data.payload,
+    expirationDate: charge.data.expiresAt,
   });
 };

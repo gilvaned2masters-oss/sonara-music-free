@@ -4,7 +4,7 @@ Cloudflare Pages deployment with isolated order storage and protected administra
 
 Oferta independente da Sonara Music publicada no Cloudflare Pages.
 
-- Checkout Pix via Asaas
+- Checkout Pix via Efí Bank, mediado por uma ponte Sonara independente
 - Painel em `/admin/`
 - Pedidos isolados no namespace `sonara-music-orders`
 

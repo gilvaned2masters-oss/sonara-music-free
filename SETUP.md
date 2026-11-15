@@ -41,7 +41,7 @@ obrigatório — só o WhatsApp automático precisa de uma VPS (opcional, ver §
 
 **Fluxo de pagamento (fallback em cascata):**
 1. **Kiwify Conta** — PIX principal, taxa zero
-2. **Asaas** — fallback se Kiwify falhar
+2. **Efí Bank** — Pix exclusivo da Sonara, via ponte mTLS independente
 3. **Mercado Pago** — fallback 2
 
 **Gerador de música (fallback):**
@@ -59,7 +59,7 @@ obrigatório — só o WhatsApp automático precisa de uma VPS (opcional, ver §
 | **Sunor** | Gerar a música (principal) | Opcional |
 | **OpenAI** | Gerar a letra (gpt-4o-mini) | ✅ Sim |
 | **Kiwify** | Receber PIX (taxa zero) | ✅ Sim (ou Asaas/MP) |
-| **Asaas** | PIX fallback | Opcional |
+| **Efí Bank** | PIX exclusivo (ponte mTLS) | Sim |
 | **Mercado Pago** | PIX fallback 2 | Opcional |
 | **Resend** | Enviar emails | ✅ Sim |
 | **Meta (Facebook)** | Pixel + Conversions API (ads) | Opcional |
@@ -115,7 +115,8 @@ Use o arquivo [`.env.example`](.env.example) como checklist. Resumo do que é ca
 | `ANTHROPIC_API_KEY` | console.anthropic.com (opcional) |
 | `KIWIFY_ACCESS_ID` | Kiwify Conta → integração PIX (Access ID) |
 | `KIWIFY_PRIVATE_KEY_HEX` | Kiwify → chave privada Ed25519 em HEX |
-| `ASAAS_API_KEY` | Asaas → Integrações → API (opcional) |
+| `EFI_BRIDGE_URL` | URL da ponte Sonara Efí (sem credenciais Efí) |
+| `EFI_BRIDGE_TOKEN` | Token exclusivo da ponte Sonara |
 | `MERCADO_PAGO_ACCESS_TOKEN` | MP → Suas integrações (opcional) |
 | `RESEND_API_KEY` | resend.com → API Keys |
 | `FROM_EMAIL` | remetente verificado no Resend (ex.: `noreply@seudominio.com`) |
@@ -163,7 +164,7 @@ Configure cada gateway pra chamar de volta o seu domínio quando o PIX for pago:
 | Gateway | URL do webhook |
 |---|---|
 | Kiwify | `https://SEU-DOMINIO/kiwify-pix-webhook` |
-| Asaas | `https://SEU-DOMINIO/asaas-webhook` |
+| Efí | Não registrar webhook na chave compartilhada; confirmação por consulta autenticada |
 | Mercado Pago | `https://SEU-DOMINIO/mp-webhook` |
 
 E o **callback do gerador**:

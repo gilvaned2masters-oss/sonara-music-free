@@ -1002,13 +1002,15 @@ function renderRows(rows) {
     var eb = (!o.delivered && o.paid) ? ' <button class="abtn gn" data-pid="'+esc(o.paymentId)+'" onclick="markDelivered(this.dataset.pid)">Entregar</button>' : '';
     var er = (!o.paid) ? ' <button class="abtn" style="border-color:#f59e0b;color:#f59e0b" data-pid="'+esc(o.paymentId)+'" data-name="'+ev+'" data-phone="'+esc(o.phone||'')+'" onclick="recoverPix(this.dataset.pid,this.dataset.name,this.dataset.phone)">&#128279; Recuperar</button>' : '';
     var artBadge = o.artPaid ? ' <span style="background:#7c3aed;color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;vertical-align:middle">🎨 Arte</span>' : '';
-    var providerBadge = o.provider === 'kiwify'
+    var providerBadge = o.provider === 'efi'
+      ? ' <span style="background:#00a859;color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;vertical-align:middle">Efí</span>'
+      : (o.provider === 'kiwify'
       ? ' <span style="background:#0a8f4d;color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;vertical-align:middle">Kiwify</span>'
       : (o.provider === 'mercadopago'
         ? ' <span style="background:#009ee3;color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;vertical-align:middle">MP</span>'
         : (o.provider === 'hotmart'
           ? ' <span style="background:#f04e23;color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;vertical-align:middle">Hotmart</span>'
-          : ''));
+          : '')));
     h += '<tr><td style="color:#888;font-size:12px">'+d+'</td><td><strong>'+ev+'</strong>'+artBadge+providerBadge+'</td><td style="color:#888">'+ee+'</td><td>'+val+'</td>'
       +'<td>'+statusBadges+'</td>'
       +'<td>'+(o.delivered?'<span style="color:#4caf82">&#10003;</span>':'<span style="color:#444">-</span>')+'</td>'
@@ -1110,25 +1112,28 @@ function populateModal(o) {
   }
 
   var provEl = document.getElementById('f-provider');
-  if (o.provider === 'hotmart') {
+  if (o.provider === 'efi') {
+    provEl.innerHTML = '<span style="background:#00a859;color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px">Efí Bank</span>';
+  } else if (o.provider === 'hotmart') {
     provEl.innerHTML = '<span style="background:#f04e23;color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px">🔥 Hotmart</span>';
   } else if (o.provider === 'kiwify') {
     provEl.innerHTML = '<span style="background:#0a8f4d;color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px">Kiwify</span>';
   } else if (o.provider === 'mercadopago') {
     provEl.innerHTML = '<span style="background:#009ee3;color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px">Mercado Pago</span>';
   } else {
-    provEl.innerHTML = '<span style="background:#5b4f8a;color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px">Asaas</span>';
+    provEl.innerHTML = '<span style="background:#475569;color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px">Legado</span>';
   }
   renderOrigem(o);
 
   // Tab 1 - Pagamento
   document.getElementById('f-valor').textContent = (isEs ? 'US$ ' : 'R$ ')+(Number(o.value)||0).toFixed(2).replace('.',',');
   var pmEl = document.getElementById('f-payment-method');
-  if (o.provider === 'hotmart') { pmEl.innerHTML = '🔥 Checkout Hotmart (USD)'; }
+  if (o.provider === 'efi') { pmEl.innerHTML = '🔑 PIX (Efí Bank)'; }
+  else if (o.provider === 'hotmart') { pmEl.innerHTML = '🔥 Checkout Hotmart (USD)'; }
   else if (o.paymentMethod === 'credit_card') { pmEl.innerHTML = '💳 Cartão de crédito'; }
   else if (o.provider === 'kiwify') { pmEl.innerHTML = '🔑 PIX (Kiwify)'; }
   else if (o.provider === 'mercadopago') { pmEl.innerHTML = '🔑 PIX (Mercado Pago)'; }
-  else { pmEl.innerHTML = '🔑 PIX (Asaas)'; }
+  else { pmEl.innerHTML = '🔑 Pagamento legado'; }
   var sb = document.getElementById('f-status-badge');
   var bc = o.refunded ? 'sb-briefing' : (o.paid ? 'sb-letra' : 'sb-briefing');
   var statusLabel = o.refunded ? '💸 Reembolsado' : (o.paid ? 'Pago' : 'Pendente');

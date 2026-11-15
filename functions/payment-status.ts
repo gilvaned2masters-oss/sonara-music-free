@@ -1,12 +1,8 @@
-import { asaas } from './_shared/asaas';
-import { sendMetaCapiPurchase } from './_shared/meta-capi';
-import { kvPutOrder } from './_shared/kv-helpers';
+import { completePaymentActivation, claimPaymentActivation, getEfiPixStatus, type EfiBridgeEnv } from './_shared/efi-bridge';
+import { activatePaidOrder, type PaymentActivationEnv } from './_shared/payment-activation';
 
-interface Env {
+interface Env extends EfiBridgeEnv, PaymentActivationEnv {
   ORDERS_KV: KVNamespace;
-  ASAAS_API_KEY: string;
-  META_PIXEL_ID: string;
-  META_CAPI_TOKEN: string;
 }
 
 function json(data: unknown, status = 200): Response {
@@ -15,8 +11,6 @@ function json(data: unknown, status = 200): Response {
     headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' },
   });
 }
-
-const PAID_STATUSES = ['RECEIVED', 'CONFIRMED', 'RECEIVED_IN_CASH'];
 
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const url = new URL(request.url);
@@ -31,40 +25,33 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   let status = String(order['status'] ?? 'PENDING');
 
   if (!isPaid) {
-    // Projeto Sonara: consulta exclusivamente o status oficial do Asaas.
-    const res = await asaas(env.ASAAS_API_KEY, 'GET', `/payments/${encodeURIComponent(paymentId)}`);
-    if (res.ok && res.data['status']) {
-      status = String(res.data['status']);
-      isPaid = PAID_STATUSES.includes(status);
-      if (isPaid) {
-        order['paid'] = true;
-        order['status'] = status;
-        order['updated_at'] = new Date().toISOString();
-        if (env.ORDERS_KV) await kvPutOrder(env.ORDERS_KV, paymentId, order);
+    if (order['provider'] === 'efi') {
+      // A liberação depende de uma segunda confirmação, diretamente na EFI.
+      // O browser nunca é fonte de verdade para pagamento.
+      const res = await getEfiPixStatus(env, String(order['txid'] ?? paymentId));
+      if (res.ok && res.data) {
+        status = res.data.status;
+        isPaid = res.data.paid && status === 'CONCLUIDA';
       }
     }
-  }
-
-  if (isPaid && !order['metaCapiSent']) {
-    const sent = await sendMetaCapiPurchase(env.META_PIXEL_ID, env.META_CAPI_TOKEN, {
-      paymentId,
-      customerId: String(order['customerId'] ?? ''),
-      externalReference: String(order['externalReference'] ?? ''),
-      name: String(order['name'] ?? ''),
-      email: String(order['email'] ?? ''),
-      phone: String(order['phone'] ?? ''),
-      value: Number(order['value'] ?? 39.9),
-      fbp: String(order['fbp'] ?? ''),
-      fbc: String(order['fbc'] ?? ''),
-      clientIp: String(order['clientIp'] ?? ''),
-      userAgent: String(order['userAgent'] ?? ''),
-      pageUrl: String(order['pageUrl'] ?? ''),
-      brief: String(order['brief'] ?? ''),
-    });
-    if (sent) {
-      order['metaCapiSent'] = true;
-      order['updated_at'] = new Date().toISOString();
-      if (env.ORDERS_KV) await kvPutOrder(env.ORDERS_KV, paymentId, order);
+    if (isPaid) {
+      order['status'] = status;
+      const txid = String(order['txid'] ?? paymentId);
+      const claim = await claimPaymentActivation(env, txid);
+      if (claim.ok && claim.data?.claim === 'acquired') {
+        try {
+          await activatePaidOrder(env, paymentId, order, new URL(request.url).origin);
+          await completePaymentActivation(env, txid);
+        } catch (error) {
+          console.error('[sonara][efi] activation failed', error instanceof Error ? error.message : 'unknown');
+          return json({ ok: false, error: 'activation_pending' }, 503);
+        }
+      } else if (claim.ok && claim.data?.claim === 'busy') {
+        return json({ ok: true, paid: false, status: 'PROCESSING' });
+      } else if (claim.ok && claim.data?.claim === 'completed') {
+        const fresh = await env.ORDERS_KV.get('order:' + paymentId);
+        if (fresh) Object.assign(order, JSON.parse(fresh) as Record<string, unknown>);
+      }
     }
   }
 
