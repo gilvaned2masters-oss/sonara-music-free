@@ -3,7 +3,9 @@ interface Env {
   ORDERS_KV: KVNamespace;
 }
 
-const GEMINI_MODEL = 'gemini-2.5-flash-lite';
+// The provider's stable alias follows the currently available Flash-Lite model
+// without pinning this project to a retired version.
+const GEMINI_MODEL = 'gemini-flash-lite-latest';
 const RATE_LIMIT_MAX_PER_HOUR = 5;
 const DEDUPE_TTL_SECONDS = 10 * 60;
 
@@ -16,6 +18,12 @@ function json(data: unknown, status = 200): Response {
 
 function clean(obj: Record<string, unknown>, key: string, limit = 800): string {
   return String(obj[key] ?? '').trim().replace(/\s+/g, ' ').slice(0, limit);
+}
+
+// Lyrics are structured text. Unlike short form fields, their line breaks are
+// meaningful and must survive the ready-lyrics path unchanged.
+function cleanMultiline(obj: Record<string, unknown>, key: string, limit: number): string {
+  return String(obj[key] ?? '').trim().slice(0, limit);
 }
 
 // ─── Mapa de estilo para o agente de letra ───────────────────────────────────
@@ -399,7 +407,7 @@ async function fingerprint(input: Record<string, unknown>, ip: string): Promise<
     destinatario: clean(input, 'destinatario', 80), relacao: clean(input, 'relacao', 80),
     ocasiao: clean(input, 'ocasiao', 80), estilo: clean(input, 'estilo', 80), voz: clean(input, 'voz', 30),
     lang: clean(input, 'lang', 5), historia: clean(input, 'historia', 900),
-    letraPronta: clean(input, 'letraPronta', 3000), currentLyrics: clean(input, 'currentLyrics', 1500),
+    letraPronta: cleanMultiline(input, 'letraPronta', 3000), currentLyrics: cleanMultiline(input, 'currentLyrics', 1500),
     correcoes: clean(input, 'correcoes', 400),
   });
   const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(safe));
@@ -555,8 +563,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const estilo        = clean(input, 'estilo', 80);
   const voz           = clean(input, 'voz', 30);
   const historia      = clean(input, 'historia', 900);
-  const letraPronta   = clean(input, 'letraPronta', 3000);
-  const currentLyrics = clean(input, 'currentLyrics', 1500);
+  const letraPronta   = cleanMultiline(input, 'letraPronta', 3000);
+  const currentLyrics = cleanMultiline(input, 'currentLyrics', 1500);
   const correcoes     = clean(input, 'correcoes', 400);
 
   if (!destinatario || !relacao || !ocasiao || !estilo || (!letraPronta && historia.length < 8)) {
@@ -570,7 +578,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   // retries briefly so a double tap does not create another provider request.
   const ip = request.headers.get('CF-Connecting-IP') || request.headers.get('X-Forwarded-For') || 'unknown';
   const hour = new Date().toISOString().slice(0, 13); // YYYY-MM-DDTHH
-  const rlKey = `ratelimit:lyrics:v2:${ip}:${hour}`;
+  const rlKey = `ratelimit:lyrics:gemini:${ip}:${hour}`;
   const requestFingerprint = await fingerprint(input, ip);
   const cacheKey = `lyrics:dedupe:${requestFingerprint}`;
   if (env.ORDERS_KV) {
