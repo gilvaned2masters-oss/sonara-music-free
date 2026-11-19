@@ -1,8 +1,11 @@
 interface Env {
-  OPENAI_API_KEY: string;
-  ANTHROPIC_API_KEY: string;
+  GEMINI_API_KEY: string;
   ORDERS_KV: KVNamespace;
 }
+
+const GEMINI_MODEL = 'gemini-2.5-flash-lite';
+const RATE_LIMIT_MAX_PER_HOUR = 5;
+const DEDUPE_TTL_SECONDS = 10 * 60;
 
 function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
@@ -299,6 +302,110 @@ async function tryOpenAI(apiKey: string, prompt: string): Promise<LyricsResult |
   } catch(e) { console.log('[lyrics] OpenAI exception:', String(e)); return null; }
 }
 
+/** Gemini is the only remote text provider used by the checkout. */
+async function tryGemini(apiKey: string, prompt: string): Promise<LyricsResult | null> {
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.82, maxOutputTokens: 2400, responseMimeType: 'application/json' },
+        }),
+        signal: AbortSignal.timeout(20_000),
+      },
+    );
+    if (!res.ok) {
+      // Do not log provider bodies: prompts can contain a customer's story.
+      console.warn('[lyrics] Gemini unavailable', res.status);
+      return null;
+    }
+    const data = await res.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
+    const text = data.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('') || '';
+    return parseResult(text);
+  } catch {
+    console.warn('[lyrics] Gemini request failed');
+    return null;
+  }
+}
+
+function defaultTitle(destinatario: string, lang: string): string {
+  if (lang === 'en') return `For ${destinatario}`;
+  return `Para ${destinatario}`;
+}
+
+function styleForProvidedLyrics(estilo: string, voz: string): string {
+  const voice = voz === 'Masculina' ? 'male vocals only, male singer' : 'female vocals only, female singer';
+  return `${estilo.toLowerCase()}, ${voice}, emotional, polished production`.slice(0, 300);
+}
+
+function buildPromptEN(
+  destinatario: string, relacao: string, ocasiao: string, estilo: string,
+  voz: string, historia: string, correcoes: string, currentLyrics: string,
+): string {
+  const voice = voz === 'Masculina' ? 'male vocals only, male singer' : 'female vocals only, female singer';
+  const revision = currentLyrics
+    ? `\nCURRENT LYRICS:\n${currentLyrics}\n${correcoes ? `REQUESTED CHANGES (apply only these changes and preserve everything else): ${correcoes}` : 'Create a distinct improved version while keeping the personal facts.'}`
+    : '';
+  return `You are a professional songwriter for personal, emotional gifts. Create an original song IN ENGLISH.
+
+Use only the personal facts supplied below. Do not invent facts, do not mention AI, avoid generic lyrics, use natural rhymes and an emotional memorable chorus. The song must fit approximately 2–3 minutes.
+
+REQUIRED STRUCTURE:
+[Verse 1]
+[Pre-Chorus]
+[Chorus]
+[Verse 2]
+[Chorus]
+[Bridge]
+[Final Chorus]
+
+CUSTOMER BRIEF:
+Recipient: ${destinatario}
+Relationship: ${relacao}
+Occasion: ${ocasiao}
+Music style: ${estilo}
+Voice: ${voz}
+Personal story: ${historia}${revision}
+
+Return valid JSON only, with this exact shape:
+{"title":"song title","lyrics":"full lyrics with section markers","style":"English Suno style, max 300 characters; include ${voice}, genre, instruments and mood; no artist names"}`;
+}
+
+function buildReadyLyricsCorrectionPrompt(
+  destinatario: string, relacao: string, ocasiao: string, estilo: string, voz: string,
+  lang: string, letraPronta: string, correcoes: string,
+): string {
+  const language = lang === 'es' ? 'Spanish' : lang === 'en' ? 'English' : 'Portuguese';
+  const voice = voz === 'Masculina' ? 'male vocals only, male singer' : 'female vocals only, female singer';
+  return `You are editing an original customer-provided song lyric in ${language}. Preserve the original lyric, facts, structure and wording except for the requested correction. Do not add unrelated facts and do not mention AI. Return valid JSON only.
+
+Recipient: ${destinatario}
+Relationship: ${relacao}
+Occasion: ${ocasiao}
+Style: ${estilo}
+Voice: ${voz}
+Original lyric:\n${letraPronta}
+Requested correction: ${correcoes}
+
+Return: {"title":"title","lyrics":"complete corrected lyric with section markers","style":"${estilo}, ${voice}, instruments and mood, max 300 characters"}`;
+}
+
+async function fingerprint(input: Record<string, unknown>, ip: string): Promise<string> {
+  const safe = JSON.stringify({
+    ip,
+    destinatario: clean(input, 'destinatario', 80), relacao: clean(input, 'relacao', 80),
+    ocasiao: clean(input, 'ocasiao', 80), estilo: clean(input, 'estilo', 80), voz: clean(input, 'voz', 30),
+    lang: clean(input, 'lang', 5), historia: clean(input, 'historia', 900),
+    letraPronta: clean(input, 'letraPronta', 3000), currentLyrics: clean(input, 'currentLyrics', 1500),
+    correcoes: clean(input, 'correcoes', 400),
+  });
+  const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(safe));
+  return Array.from(new Uint8Array(bytes)).map(v => v.toString(16).padStart(2, '0')).join('');
+}
+
 function fallbackLyrics(destinatario: string, voz: string, estilo: string): LyricsResult {
   const nome = destinatario || 'meu amor';
   const voiceTag = voz === 'Masculina'
@@ -442,14 +549,23 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   try { input = await request.json() as Record<string, unknown>; }
   catch { return json({ ok: false, error: 'invalid_json' }, 400); }
 
-  // ── Rate limit por IP: 5 letras por hora ────────────────────────────────────
+  // ── Rate limit and short response cache for the free Gemini quota ──────────
   const ip = request.headers.get('CF-Connecting-IP') || request.headers.get('X-Forwarded-For') || 'unknown';
   const hour = new Date().toISOString().slice(0, 13); // YYYY-MM-DDTHH
   const rlKey = `ratelimit:lyrics:${ip}:${hour}`;
+  const requestFingerprint = await fingerprint(input, ip);
+  const cacheKey = `lyrics:dedupe:${requestFingerprint}`;
   if (env.ORDERS_KV) {
+    const cached = await env.ORDERS_KV.get(cacheKey);
+    if (cached) {
+      try {
+        const result = JSON.parse(cached) as LyricsResult & { source?: string };
+        if (result.lyrics) return json({ ok: true, ...result, source: result.source || 'gemini', cached: true });
+      } catch { /* ignore corrupted cache entry */ }
+    }
     const rlRaw = await env.ORDERS_KV.get(rlKey);
     const rlCount = rlRaw ? parseInt(rlRaw) : 0;
-    if (rlCount >= 20) {
+    if (rlCount >= RATE_LIMIT_MAX_PER_HOUR) {
       console.log('[ratelimit] lyrics IP bloqueado:', ip, 'tentativas:', rlCount);
       return json({ ok: false, error: 'rate_limit', message: 'Muitas gerações. Aguarde alguns minutos.' }, 429);
     }
@@ -462,40 +578,46 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const estilo        = clean(input, 'estilo', 80);
   const voz           = clean(input, 'voz', 30);
   const historia      = clean(input, 'historia', 900);
+  const letraPronta   = clean(input, 'letraPronta', 3000);
   const currentLyrics = clean(input, 'currentLyrics', 1500);
   const correcoes     = clean(input, 'correcoes', 400);
 
-  if (!destinatario || !relacao || !ocasiao || !estilo || historia.length < 8) {
+  if (!destinatario || !relacao || !ocasiao || !estilo || (!letraPronta && historia.length < 8)) {
     return json({ ok: false, error: 'missing_fields' }, 422);
+  }
+  if (letraPronta && letraPronta.length < 250) {
+    return json({ ok: false, error: 'ready_lyrics_too_short', message: 'Cole a letra completa, com pelo menos 250 caracteres.' }, 422);
   }
 
   const lang = (clean(input, 'lang', 5) || 'pt').toLowerCase();
-  const prompt = lang === 'es'
-    ? buildPromptES(destinatario, relacao, ocasiao, estilo, voz, historia, correcoes, currentLyrics)
-    : buildPrompt(destinatario, relacao, ocasiao, estilo, voz, historia, correcoes, currentLyrics);
-
-  // 1. Tenta Claude (Anthropic) — principal
-  if (env.ANTHROPIC_API_KEY) {
-    const result = await tryAnthropic(env.ANTHROPIC_API_KEY, prompt);
-    if (result) {
-      result.lyrics = applyPronunciation(result.lyrics);
-      return json({ ok: true, ...result, source: 'anthropic' });
-    }
+  // Keep a customer-provided lyric byte-for-byte unless they explicitly ask
+  // for a correction. It is not sent to Gemini on this direct path.
+  if (letraPronta && !correcoes) {
+    const result: LyricsResult & { source: string } = {
+      title: defaultTitle(destinatario, lang), lyrics: letraPronta,
+      style: styleForProvidedLyrics(estilo, voz), source: 'provided',
+    };
+    if (env.ORDERS_KV) await env.ORDERS_KV.put(cacheKey, JSON.stringify(result), { expirationTtl: DEDUPE_TTL_SECONDS });
+    return json({ ok: true, ...result });
   }
 
-  // 2. Fallback: GPT-4o-mini
-  if (env.OPENAI_API_KEY) {
-    const result = await tryOpenAI(env.OPENAI_API_KEY, prompt);
-    if (result) {
-      result.lyrics = applyPronunciation(result.lyrics);
-      return json({ ok: true, ...result, source: 'openai' });
-    }
-  }
+  const prompt = letraPronta
+    ? buildReadyLyricsCorrectionPrompt(destinatario, relacao, ocasiao, estilo, voz, lang, letraPronta, correcoes)
+    : lang === 'es'
+      ? buildPromptES(destinatario, relacao, ocasiao, estilo, voz, historia, correcoes, currentLyrics)
+      : lang === 'en'
+        ? buildPromptEN(destinatario, relacao, ocasiao, estilo, voz, historia, correcoes, currentLyrics)
+        : buildPrompt(destinatario, relacao, ocasiao, estilo, voz, historia, correcoes, currentLyrics);
 
-  // 3. Fallback local
-  const result = lang === 'es'
-    ? fallbackLyricsES(destinatario, voz, estilo)
-    : fallbackLyrics(destinatario, voz, estilo);
-  result.lyrics = applyPronunciation(result.lyrics);
-  return json({ ok: true, ...result, source: 'fallback' });
+  if (!env.GEMINI_API_KEY) {
+    return json({ ok: false, error: 'lyrics_unavailable', message: 'A geração de letras está temporariamente indisponível. Tente novamente em alguns minutos.' }, 503);
+  }
+  const result = await tryGemini(env.GEMINI_API_KEY, prompt);
+  if (!result) {
+    return json({ ok: false, error: 'lyrics_unavailable', message: 'Não foi possível gerar sua letra agora. Nenhuma letra genérica foi criada; tente novamente em alguns minutos.' }, 503);
+  }
+  if (lang === 'pt') result.lyrics = applyPronunciation(result.lyrics);
+  const output = { ...result, source: 'gemini' };
+  if (env.ORDERS_KV) await env.ORDERS_KV.put(cacheKey, JSON.stringify(output), { expirationTtl: DEDUPE_TTL_SECONDS });
+  return json({ ok: true, ...output });
 };

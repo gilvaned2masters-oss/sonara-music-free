@@ -2488,8 +2488,7 @@ essa canção é você.`;
         const aiTitle = data.title || "Sua música personalizada";
         document.getElementById("generatedLyrics").value = data.lyrics || "";
         document.getElementById("sunorStyle").value = data.style || "";
-        // O servidor também tem um fallback local (source:'fallback') — conta como genérica igual.
-        lyricsSource = (data.source === 'fallback') ? 'fallback' : 'ai';
+        lyricsSource = data.source || 'gemini';
         renderLyricCard(data.lyrics || '', aiTitle, value("destinatario"));
         track('lyrics_generated');
         // Marca a correção como APLICADA (a IA já recebeu e reescreveu com ela).
@@ -2500,8 +2499,13 @@ essa canção é você.`;
         }
         saveCheckoutState();
       } catch (error) {
-        console.warn("Falha ao gerar com IA, usando fallback local:", error);
-        fallbackLyrics();
+        // Never continue to checkout with a generic lyric when Gemini is unavailable.
+        lyricsBlocked = true;
+        setStep(0);
+        errorBox.textContent = (error && error.message)
+          ? String(error.message)
+          : 'Não foi possível gerar sua letra agora. Tente novamente em alguns minutos.';
+        errorBox.classList.add('show');
       } finally {
         clearInterval(_loadingTimer);
         // Revela os elementos pós-letra só quando há letra (sucesso ou fallback).
