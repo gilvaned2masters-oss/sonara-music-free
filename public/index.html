@@ -2484,7 +2484,7 @@ essa canção é você.`;
           alert('⚠️ ' + (data.message || 'Muitas gerações. Aguarde alguns minutos e tente novamente.'));
           return;
         }
-        if (!response.ok || !data.ok) throw new Error(data.error || "ai_error");
+        if (!response.ok || !data.ok) throw new Error(data.message || data.error || "ai_error");
         const aiTitle = data.title || "Sua música personalizada";
         document.getElementById("generatedLyrics").value = data.lyrics || "";
         document.getElementById("sunorStyle").value = data.style || "";

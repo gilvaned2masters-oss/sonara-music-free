@@ -549,10 +549,28 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   try { input = await request.json() as Record<string, unknown>; }
   catch { return json({ ok: false, error: 'invalid_json' }, 400); }
 
-  // ── Rate limit and short response cache for the free Gemini quota ──────────
+  const destinatario  = clean(input, 'destinatario', 80);
+  const relacao       = clean(input, 'relacao', 80);
+  const ocasiao       = clean(input, 'ocasiao', 80);
+  const estilo        = clean(input, 'estilo', 80);
+  const voz           = clean(input, 'voz', 30);
+  const historia      = clean(input, 'historia', 900);
+  const letraPronta   = clean(input, 'letraPronta', 3000);
+  const currentLyrics = clean(input, 'currentLyrics', 1500);
+  const correcoes     = clean(input, 'correcoes', 400);
+
+  if (!destinatario || !relacao || !ocasiao || !estilo || (!letraPronta && historia.length < 8)) {
+    return json({ ok: false, error: 'missing_fields' }, 422);
+  }
+  if (letraPronta && letraPronta.length < 250) {
+    return json({ ok: false, error: 'ready_lyrics_too_short', message: 'Cole a letra completa, com pelo menos 250 caracteres.' }, 422);
+  }
+
+  // Invalid requests never consume free Gemini quota. Cache identical valid
+  // retries briefly so a double tap does not create another provider request.
   const ip = request.headers.get('CF-Connecting-IP') || request.headers.get('X-Forwarded-For') || 'unknown';
   const hour = new Date().toISOString().slice(0, 13); // YYYY-MM-DDTHH
-  const rlKey = `ratelimit:lyrics:${ip}:${hour}`;
+  const rlKey = `ratelimit:lyrics:v2:${ip}:${hour}`;
   const requestFingerprint = await fingerprint(input, ip);
   const cacheKey = `lyrics:dedupe:${requestFingerprint}`;
   if (env.ORDERS_KV) {
@@ -570,23 +588,6 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       return json({ ok: false, error: 'rate_limit', message: 'Muitas gerações. Aguarde alguns minutos.' }, 429);
     }
     await env.ORDERS_KV.put(rlKey, String(rlCount + 1), { expirationTtl: 3600 });
-  }
-
-  const destinatario  = clean(input, 'destinatario', 80);
-  const relacao       = clean(input, 'relacao', 80);
-  const ocasiao       = clean(input, 'ocasiao', 80);
-  const estilo        = clean(input, 'estilo', 80);
-  const voz           = clean(input, 'voz', 30);
-  const historia      = clean(input, 'historia', 900);
-  const letraPronta   = clean(input, 'letraPronta', 3000);
-  const currentLyrics = clean(input, 'currentLyrics', 1500);
-  const correcoes     = clean(input, 'correcoes', 400);
-
-  if (!destinatario || !relacao || !ocasiao || !estilo || (!letraPronta && historia.length < 8)) {
-    return json({ ok: false, error: 'missing_fields' }, 422);
-  }
-  if (letraPronta && letraPronta.length < 250) {
-    return json({ ok: false, error: 'ready_lyrics_too_short', message: 'Cole a letra completa, com pelo menos 250 caracteres.' }, 422);
   }
 
   const lang = (clean(input, 'lang', 5) || 'pt').toLowerCase();
